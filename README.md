@@ -1,4 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Markdown Editor & Viewer
+
+A fully offline, free markdown-based notes and documentation system built with Next.js.
+
+## Core Identity
+**A fully offline, free markdown-based notes and documentation system**
+
+## Key Features
+
+### 1. **Storage & Privacy**
+- ✅ 100% client-side storage (IndexedDB/LocalStorage)
+- ✅ No server dependency
+- ✅ All data stays on user's device
+- ✅ Works completely offline
+
+### 2. **Pricing Model**
+- ✅ Completely free
+- ✅ No subscription
+- ✅ No premium tiers
+- ✅ Open source
+
+### 3. **Markdown Capabilities**
+- ✅ Live markdown editor with preview
+- ✅ Syntax highlighting
+- ✅ Support for tables, code blocks, lists, etc.
+- ✅ Toggle between edit/preview/split view
+
+### 4. **Organization System**
+- ✅ **Projects/Folders** - hierarchical organization
+- ✅ **Files** - markdown documents within folders
+- ✅ Nested folder support
+- ✅ File/folder management (create, rename, delete, move)
+
+### 5. **Export Options**
+- ✅ Markdown (.md)
+- ✅ HTML
+- ✅ Plain Text (.txt)
+- ✅ PDF
+- ✅ Word Document (.docx)
+- ✅ Bulk export (entire project/folder)
 
 ## Getting Started
 
@@ -34,3 +73,18 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Unique Selling Points
+1. **Privacy-first** - Your notes never leave your device
+2. **Zero cost** - No hidden fees ever
+3. **Portable** - Export to any format
+4. **Professional** - Perfect for documentation
+
+## Tech Stack
+- **Framework**: React, Vue, or Svelte
+- **Storage**: IndexedDB (Dexie.js) or LocalStorage
+- **Markdown**: Marked.js or Unified.js
+- **Export**:
+  - PDF: jsPDF or html2pdf
+  - DOCX: docx.js
+  - HTML: Built-in conversion

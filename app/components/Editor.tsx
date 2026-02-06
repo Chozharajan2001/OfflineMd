@@ -1,11 +1,25 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import MonacoEditor from '@monaco-editor/react';
 import { useMarkdownStore } from '../store';
 
 export function Editor() {
     const { markdown, setMarkdown, theme } = useMarkdownStore();
+    const [isClient, setIsClient] = useState(false);
+
+    React.useEffect(() => {
+        setIsClient(true);
+    }, []);
+
+    // Show loading state during SSR/hydration
+    if (!isClient) {
+        return (
+            <div className="h-full w-full flex items-center justify-center bg-gray-900">
+                <div className="text-gray-500">Loading editor...</div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-full w-full">

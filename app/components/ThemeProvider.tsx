@@ -26,6 +26,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         // Editor specifics (for containers outside monaco)
         root.style.setProperty('--editor-bg', theme.editor.background);
         root.style.setProperty('--preview-bg', theme.preview.background);
+
+        // Add a smooth transition for theme variable changes (150ms)
+        root.style.transition = 'background-color 150ms ease, color 150ms ease, border-color 150ms ease';
     }, [theme, isMounted]);
 
     // 2. Sync Monaco Theme

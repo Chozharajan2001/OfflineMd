@@ -4,7 +4,12 @@ import React, { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Settings, Save, FolderOpen, Upload, Download } from 'lucide-react';
 import { useMarkdownStore, themes } from '../store';
-import { ExportService } from '../services/ExportService';
+import { ExportOrchestrator } from '../../src/export/export-service';
+import type { ExportFormat, ExportOptions } from '../../src/export/types';
+import { ExportMenu } from '../../src/export/components/ExportMenu';
+import { ExportOptionsDialog } from '../../src/export/components/ExportOptionsDialog';
+import { ExportProgressBar } from '../../src/export/components/ExportProgressBar';
+import { triggerDownload } from '../../src/export/utils/file-saver';
 import { db } from '../services/Database';
 
 export function Header() {
@@ -14,6 +19,9 @@ export function Header() {
         activeFileId, activeProjectId, setActiveFile // Use new store values
     } = useMarkdownStore();
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [exportFormat, setExportFormat] = useState<ExportFormat | null>(null);
+    const [optionsOpen, setOptionsOpen] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
     const handleSave = async () => {
         if (activeFileId) {
@@ -101,21 +109,40 @@ export function Header() {
                     </label>
                 </div>
 
-                {/* Export Operations */}
-                <div className="flex gap-1 border-r border-gray-600 pr-2 mr-2">
-                    <button onClick={() => ExportService.exportToPDF('preview-content')} className="p-2 hover:bg-gray-700 rounded transition-colors" title="Export PDF">
-                        <span className="text-xs font-bold">PDF</span>
-                    </button>
-                    <button onClick={() => ExportService.exportToWord(markdown)} className="p-2 hover:bg-gray-700 rounded transition-colors" title="Export Word">
-                        <span className="text-xs font-bold">DOC</span>
-                    </button>
-                    <button onClick={() => ExportService.exportToHTML(document.querySelector('.preview-content')?.innerHTML || '')} className="p-2 hover:bg-gray-700 rounded transition-colors" title="Export HTML">
-                        <span className="text-xs font-bold">HTML</span>
-                    </button>
-                    <button onClick={() => ExportService.exportToMarkdown(markdown)} className="p-2 hover:bg-gray-700 rounded transition-colors" title="Export MD">
-                        <Download className="w-5 h-5" />
-                    </button>
-                </div>
+                {/* Export Operations – using ExportMenu */}
+                <ExportMenu
+                    onSelect={(format) => {
+                        setExportFormat(format);
+                        setOptionsOpen(true);
+                    }}
+                />
+
+                {/* Export options dialog */}
+                <ExportOptionsDialog
+                    open={optionsOpen}
+                    onOpenChange={setOptionsOpen}
+                    format={exportFormat}
+                    onExport={async (format, options) => {
+                        setExporting(true);
+                        try {
+                            const { markdown, theme } = useMarkdownStore.getState();
+                            const input = {
+                                markdown,
+                                ast: undefined,
+                                theme: theme as any,
+                                options,
+                                metadata: {}
+                            };
+                            const result = await ExportOrchestrator.export(format, input);
+                            await triggerDownload(result.blob, result.filename);
+                        } finally {
+                            setExporting(false);
+                        }
+                    }}
+                />
+
+                {/* Export progress overlay */}
+                <ExportProgressBar visible={exporting} />
 
                 {/* Settings */}
                 <Dialog.Root open={settingsOpen} onOpenChange={setSettingsOpen}>

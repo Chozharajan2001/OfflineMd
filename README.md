@@ -1,90 +1,205 @@
-# Markdown Editor & Viewer
+# Markdown Editor & Converter
 
-A fully offline, free markdown-based notes and documentation system built with Next.js.
+A powerful, fully offline markdown editor with live preview, project management, and multi-format export capabilities. Built with Next.js and React.
 
 ## Core Identity
-**A fully offline, free markdown-based notes and documentation system**
+
+**A privacy-first, offline-capable markdown editor with professional export features.**
+
+---
 
 ## Key Features
 
-### 1. **Storage & Privacy**
-- ✅ 100% client-side storage (IndexedDB/LocalStorage)
-- ✅ No server dependency
-- ✅ All data stays on user's device
-- ✅ Works completely offline
+### Privacy & Offline
+- 100% client-side storage using IndexedDB (via Dexie.js)
+- Zero server dependencies - all data stays on your device
+- Works completely offline as a Progressive Web App (PWA)
+- No account required, no data collection
 
-### 2. **Pricing Model**
-- ✅ Completely free
-- ✅ No subscription
-- ✅ No premium tiers
-- ✅ Open source
+### Editor Features
+- **Monaco Editor** integration - the same editor powering VS Code
+- Live markdown preview with split-pane layout
+- Syntax highlighting for code blocks (via highlight.js)
+- Mermaid diagram support (flowcharts, sequence diagrams, etc.)
+- Responsive resizable panels
 
-### 3. **Markdown Capabilities**
-- ✅ Live markdown editor with preview
-- ✅ Syntax highlighting
-- ✅ Support for tables, code blocks, lists, etc.
-- ✅ Toggle between edit/preview/split view
+### Organization System
+- **Projects** - Create multiple projects for different contexts
+- **Hierarchical folders** - Organize files with nested folder support
+- **File management** - Create, rename, delete, and move files and folders
+- **Recent files** - Quick access to recently edited documents
 
-### 4. **Organization System**
-- ✅ **Projects/Folders** - hierarchical organization
-- ✅ **Files** - markdown documents within folders
-- ✅ Nested folder support
-- ✅ File/folder management (create, rename, delete, move)
+### Theming System
+- **17 Built-in Themes**: Dark, Light, Dracula, GitHub Light/Dark, Nord, One Dark Pro, Tokyo Night, Solarized Light/Dark, Monokai Pro, Gruvbox Dark, Notion, Obsidian, Sepia, Forest, Ocean
+- Customizable editor fonts and sizes
+- Theme-aware preview rendering
+- CSS variable-based theming
 
-### 5. **Export Options**
-- ✅ Markdown (.md)
-- ✅ HTML
-- ✅ Plain Text (.txt)
-- ✅ PDF
-- ✅ Word Document (.docx)
-- ✅ Bulk export (entire project/folder)
+### Export Options
+| Format | Status | Notes |
+|--------|--------|-------|
+| **Markdown (.md)** | Ready | Raw markdown export |
+| **HTML (.html)** | Ready | Self-contained with theme CSS |
+| **Plain Text (.txt)** | Ready | Stripped markdown formatting |
+| **PDF (.pdf)** | Ready | Multi-page with WinAnsi encoding support |
+| **Word (.docx)** | Ready | Basic formatting (raw text) |
+| **PowerPoint (.pptx)** | Ready | Placeholder implementation |
+
+---
+
+## Tech Stack
+
+- **Framework**: Next.js 16.1.4 with React 19.2.3
+- **Language**: TypeScript 5
+- **Styling**: Tailwind CSS 4 with custom theme variables
+- **Editor**: Monaco Editor (@monaco-editor/react)
+- **State Management**: Zustand 5 with persistence middleware
+- **Storage**: Dexie.js (IndexedDB wrapper)
+- **Markdown Processing**: Unified.js ecosystem (remark-parse, remark-rehype, rehype-highlight, rehype-sanitize)
+- **Diagrams**: Mermaid 11.12.2
+- **Export Libraries**: 
+  - pdf-lib (PDF generation)
+  - docx.js (Word documents)
+  - file-saver (Downloads)
+- **UI Components**: Radix UI primitives (Dialog, Dropdown Menu, Tabs, Tooltip)
+- **Icons**: Lucide React
+- **PWA**: next-pwa for offline capabilities
+
+---
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18+ 
+- npm, yarn, or pnpm
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd markdown-converter
+
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Available Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev      # Start development server with webpack
+npm run build    # Build for production
+npm run start    # Start production server
+npm run lint     # Run ESLint
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+markdown-converter/
+├── app/                          # Next.js App Router
+│   ├── components/               # React components
+│   │   ├── Editor.tsx           # Monaco Editor wrapper
+│   │   ├── Preview.tsx          # Markdown preview with Mermaid
+│   │   ├── Header.tsx           # Toolbar with export/settings
+│   │   ├── Sidebar.tsx          # Project/file navigation
+│   │   ├── ResizableLayout.tsx  # Split-pane layout
+│   │   └── ThemeProvider.tsx    # Theme synchronization
+│   ├── services/                # Business logic
+│   │   ├── Database.ts          # Dexie.js IndexedDB schema
+│   │   ├── MarkdownParser.ts    # Unified.js processor
+│   │   └── ExportService.ts     # Legacy export (deprecated)
+│   ├── store.ts                 # Zustand state management
+│   ├── layout.tsx               # Root layout with PWA config
+│   ├── page.tsx                 # Main page
+│   └── globals.css              # Global styles & Tailwind
+├── src/export/                  # New export system
+│   ├── export-service.ts        # Export orchestrator
+│   ├── types.ts                 # Export type definitions
+│   ├── components/              # Export UI components
+│   └── exporters/               # Format-specific exporters
+│       ├── markdown-exporter.ts
+│       ├── html-exporter.ts
+│       ├── pdf-exporter.ts
+│       ├── docx-exporter.ts
+│       ├── plaintext-exporter.ts
+│       └── pptx-exporter.ts
+├── types/                       # TypeScript declarations
+├── public/                      # Static assets
+└── Documentation files (README, CONTRIBUTING, etc.)
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Data Flow
+```
+User Input → Editor Component → Zustand Store → Preview Component → Rendered HTML
+                  ↓
+            IndexedDB (Dexie.js)
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### State Management
+- **Global State**: Zustand store with localStorage persistence
+- **Database**: Dexie.js for file/project storage in IndexedDB
+- **Reactive Queries**: dexie-react-hooks for live UI updates
+
+### Security
+- All HTML sanitized via `rehype-sanitize`
+- XSS protection on rendered content
+- No external data transmission
+
+---
+
+## Browser Support
+
+- Chrome/Edge 90+
+- Firefox 88+
+- Safari 14+
+- Opera 76+
+
+**Note**: Requires IndexedDB support for file storage.
+
+---
 
 ## Unique Selling Points
-1. **Privacy-first** - Your notes never leave your device
-2. **Zero cost** - No hidden fees ever
-3. **Portable** - Export to any format
-4. **Professional** - Perfect for documentation
 
-## Tech Stack
-- **Framework**: React, Vue, or Svelte
-- **Storage**: IndexedDB (Dexie.js) or LocalStorage
-- **Markdown**: Marked.js or Unified.js
-- **Export**:
-  - PDF: jsPDF or html2pdf
-  - DOCX: docx.js
-  - HTML: Built-in conversion
+1. **True Privacy** - Your documents never leave your device
+2. **Zero Cost** - Completely free, no subscriptions
+3. **Professional Editor** - Monaco Editor with IDE-like experience
+4. **Flexible Export** - Multiple formats for sharing
+5. **Works Offline** - PWA support for any environment
+6. **Open Source** - Community-driven development
+
+---
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+---
+
+## Documentation
+
+- [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) - Comprehensive developer documentation
+- [TECHNICAL_DOCS.md](./TECHNICAL_DOCS.md) - Technical architecture details
+- [QUICK_START.md](./QUICK_START.md) - Rapid setup guide
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - Contribution guidelines
+
+---
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+---
+
+Built with modern web technologies for developers who value privacy and performance.

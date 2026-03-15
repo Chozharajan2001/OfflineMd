@@ -424,7 +424,7 @@ export class PdfExporter implements IExporter {
         page: any, runs: TextRun[], x: number, y: number, fontSize: number, lineHeight: number,
         margin: number, pageWidth: number, pageHeight: number, pdfDoc: any,
         helvetica: any, helveticaBold: any, helveticaOblique: any, helveticaBoldOblique: any, courier: any,
-        accent: any, textCol: any, codeBg: any, maxWidth: number, rgbFunc: any
+        accent: any, textCol: any, codeBg: any, maxWidth: number, rgb: any
     ): number {
         let currentX = x;
         let currentY = y;
@@ -436,7 +436,7 @@ export class PdfExporter implements IExporter {
             else if (run.italic) font = helveticaOblique;
             else if (run.code) font = courier;
 
-            const color = run.code ? rgbFunc(accent.r, accent.g, accent.b) : rgbFunc(textCol.r, textCol.g, textCol.b);
+            const color = run.code ? rgb(accent.r, accent.g, accent.b) : rgb(textCol.r, textCol.g, textCol.b);
 
             // Handle line wrapping for this run
             const words = run.text.split(/(\s+)/);
@@ -459,7 +459,7 @@ export class PdfExporter implements IExporter {
                         y: currentY - 2,
                         width: wordWidth + 4,
                         height: fontSize + 4,
-                        color: rgbFunc(codeBg.r, codeBg.g, codeBg.b)
+                        color: rgb(codeBg.r, codeBg.g, codeBg.b)
                     });
                 }
 

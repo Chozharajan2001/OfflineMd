@@ -26,6 +26,9 @@ export class HtmlExporter implements IExporter {
         // Inline theme CSS if requested
         const styleBlock = options.includeTheme ? `<style>${themeToCSS(theme)}</style>` : '';
 
+        // Mermaid support (client-side) - load mermaid.js in exported HTML
+        const mermaidScript = `<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script><script>if (typeof mermaid !== 'undefined') mermaid.initialize({ startOnLoad: true, theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default' });</script>`;
+
         // Create self-contained HTML document
         const fullHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -37,6 +40,7 @@ export class HtmlExporter implements IExporter {
 </head>
 <body class="preview-content">
   ${safeHtml}
+  ${mermaidScript}
 </body>
 </html>`;
 

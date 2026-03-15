@@ -55,8 +55,23 @@ export function Preview() {
     // Re-run mermaid diagrams after HTML updates
     useEffect(() => {
         if (!isClient) return;
+        // Convert fenced mermaid blocks into mermaid containers for rendering
+        const convertMermaidBlocks = () => {
+            const codeBlocks = document.querySelectorAll('pre > code.language-mermaid');
+            codeBlocks.forEach((codeEl) => {
+                const text = codeEl.textContent || '';
+                const wrapper = document.createElement('div');
+                wrapper.className = 'mermaid';
+                wrapper.textContent = text;
+                const pre = codeEl.parentElement;
+                if (pre && pre.parentElement) {
+                    pre.parentElement.replaceChild(wrapper, pre);
+                }
+            });
+        };
+        convertMermaidBlocks();
         const timer = setTimeout(() => {
-            const mermaidNodes = document.querySelectorAll('.language-mermaid');
+            const mermaidNodes = document.querySelectorAll('.mermaid');
             if (mermaidNodes.length > 0) {
                 mermaid
                     .run({ nodes: Array.from(mermaidNodes) as HTMLElement[] })

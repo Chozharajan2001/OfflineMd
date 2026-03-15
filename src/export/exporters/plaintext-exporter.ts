@@ -29,7 +29,7 @@ class MarkdownToPlainText {
             }
 
             if (inCodeBlock) {
-                codeContent += line;
+                codeContent += (codeContent ? '\n' : '') + line;
                 continue;
             }
 
@@ -105,11 +105,26 @@ export class PlaintextExporter implements IExporter {
     async export(input: ExportInput): Promise<ExportResult> {
         const start = performance.now();
 
-        const converter = new MarkdownToPlainText();
-        const plainText = converter.convert(input.markdown);
+        try {
+            // Validate input
+            if (!input.markdown || typeof input.markdown !== 'string') {
+                throw new Error('Invalid markdown content');
+            }
+
+            const converter = new MarkdownToPlainText();
+            const plainText = converter.convert(input.markdown);
 
         const blob = new Blob([plainText], { type: this.mimeType });
-        const filename = 'document' + this.extension;
+        
+        // Generate filename with timestamp and sanitized title
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const safeTitle = (input.metadata?.title || 'document')
+            .replace(/[^a-z0-9\s\-_]/gi, '_')
+            .replace(/\s+/g, '-')
+            .toLowerCase()
+            .slice(0, 50);
+        const filename = `${safeTitle}_${timestamp}${this.extension}`;
+        
         const duration = performance.now() - start;
 
         return {
@@ -119,5 +134,10 @@ export class PlaintextExporter implements IExporter {
             size: blob.size,
             duration
         };
+        
+        } catch (error) {
+            console.error('Plaintext export failed:', error);
+            throw new Error(`Failed to export plaintext: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 }

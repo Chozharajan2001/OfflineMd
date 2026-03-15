@@ -17,11 +17,17 @@ export class HtmlExporter implements IExporter {
     async export({ markdown, theme, options, metadata }: ExportInput): Promise<ExportResult> {
         const start = performance.now();
 
-        // Convert markdown to HTML
-        const rawHtml = await markdownParser.parse(markdown);
+        try {
+            // Validate input
+            if (!markdown || typeof markdown !== 'string') {
+                throw new Error('Invalid markdown content');
+            }
 
-        // Sanitize HTML
-        const safeHtml = await sanitizeHTML(rawHtml);
+            // Convert markdown to HTML
+            const rawHtml = await markdownParser.parse(markdown);
+
+            // Sanitize HTML
+            const safeHtml = await sanitizeHTML(rawHtml);
 
         // Inline theme CSS if requested
         const styleBlock = options.includeTheme ? `<style>${themeToCSS(theme)}</style>` : '';
@@ -45,8 +51,22 @@ export class HtmlExporter implements IExporter {
 </html>`;
 
         const blob = new Blob([fullHtml], { type: this.mimeType });
-        const filename = 'document' + this.extension;
+        
+        // Generate filename with timestamp and sanitized title
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const safeTitle = (metadata?.title || 'document')
+            .replace(/[^a-z0-9\s\-_]/gi, '_')
+            .replace(/\s+/g, '-')
+            .toLowerCase()
+            .slice(0, 50);
+        const filename = `${safeTitle}_${timestamp}${this.extension}`;
+        
         const duration = performance.now() - start;
         return { blob, filename, mimeType: this.mimeType, size: blob.size, duration };
+        
+        } catch (error) {
+            console.error('HTML export failed:', error);
+            throw new Error(`Failed to export HTML: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 }

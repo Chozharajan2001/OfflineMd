@@ -85,10 +85,17 @@ export class PptxExporter implements IExporter {
 
     async export(input: ExportInput): Promise<ExportResult> {
         const start = performance.now();
-        const { markdown, theme } = input;
+        
+        try {
+            const { markdown, theme } = input;
 
-        const PptxGenJS = (await import('pptxgenjs')).default;
-        const pres = new PptxGenJS();
+            // Validate input
+            if (!markdown || typeof markdown !== 'string') {
+                throw new Error('Invalid markdown content');
+            }
+
+            const PptxGenJS = (await import('pptxgenjs')).default;
+            const pres = new PptxGenJS();
 
         pres.layout = 'LAYOUT_16x9';
         pres.title = 'Markdown Presentation';
@@ -174,7 +181,16 @@ export class PptxExporter implements IExporter {
 
         const pptxOut = await pres.write(pptxOptions);
         const blob = new Blob([pptxOut] as BlobPart[], { type: this.mimeType });
-        const filename = 'document' + this.extension;
+        
+        // Generate filename with timestamp and sanitized title
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const safeTitle = (input.metadata?.title || 'document')
+            .replace(/[^a-z0-9\s\-_]/gi, '_')
+            .replace(/\s+/g, '-')
+            .toLowerCase()
+            .slice(0, 50);
+        const filename = `${safeTitle}_${timestamp}${this.extension}`;
+        
         const duration = performance.now() - start;
 
         return {
@@ -184,6 +200,11 @@ export class PptxExporter implements IExporter {
             size: blob.size,
             duration
         };
+        
+        } catch (error) {
+            console.error('PPTX export failed:', error);
+            throw new Error(`Failed to export PPTX: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 
     private hexToRgb(hex: string): { r: number; g: number; b: number } {

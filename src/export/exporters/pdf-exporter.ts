@@ -180,10 +180,17 @@ export class PdfExporter implements IExporter {
 
     async export(input: ExportInput): Promise<ExportResult> {
         const start = performance.now();
-        const { markdown, theme, options } = input;
+        
+        try {
+            const { markdown, theme, options } = input;
 
-        const { PDFDocument, StandardFonts, rgb, PageSizes } = await import('pdf-lib');
-        const pdfDoc = await PDFDocument.create();
+            // Validate input
+            if (!markdown || typeof markdown !== 'string') {
+                throw new Error('Invalid markdown content');
+            }
+
+            const { PDFDocument, StandardFonts, rgb, PageSizes } = await import('pdf-lib');
+            const pdfDoc = await PDFDocument.create();
 
         const pageSizeName = options.pageSize || 'A4';
         let pageSize = PageSizes.A4;
@@ -413,11 +420,25 @@ export class PdfExporter implements IExporter {
         }
 
         const pdfBytes = await pdfDoc.save();
-        const blob = new Blob([pdfBytes] as BlobPart[], { type: this.mimeType });
-        const filename = 'document' + this.extension;
+        const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: this.mimeType });
+        
+        // Generate filename with timestamp and sanitized title
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const safeTitle = (input.metadata?.title || 'document')
+            .replace(/[^a-z0-9\s\-_]/gi, '_')
+            .replace(/\s+/g, '-')
+            .toLowerCase()
+            .slice(0, 50);
+        const filename = `${safeTitle}_${timestamp}${this.extension}`;
+        
         const duration = performance.now() - start;
 
         return { blob, filename, mimeType: this.mimeType, size: blob.size, duration };
+        
+        } catch (error) {
+            console.error('PDF export failed:', error);
+            throw new Error(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 
     private drawFormattedText(

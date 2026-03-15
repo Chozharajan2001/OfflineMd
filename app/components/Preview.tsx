@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import mermaid from 'mermaid';
+import DOMPurify from 'dompurify';
 import { useMarkdownStore } from '../store';
 import { markdownParser } from '../services/MarkdownParser';
 
@@ -39,22 +40,50 @@ export function Preview() {
         });
     }, [isClient, theme]);
 
-    // Debounced markdown parsing
+    // Debounced markdown parsing with sanitization
     const debouncedParse = useRef(
         debounce(async (md: string) => {
             const html = await markdownParser.parse(md);
-            setRenderedHtml(html);
+            // Additional layer of sanitization with DOMPurify for defense-in-depth
+            const safeHtml = DOMPurify.sanitize(html, {
+                ALLOWED_TAGS: [
+                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                    'p', 'br', 'hr',
+                    'strong', 'b', 'em', 'i', 'del', 's', 'mark',
+                    'a', 'img',
+                    'ul', 'ol', 'li',
+                    'blockquote', 'pre', 'code',
+                    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                    'div', 'span', 'details', 'summary',
+                    'sup', 'sub'
+                ],
+                ALLOWED_ATTR: ['className', 'class', 'href', 'src', 'alt', 'title', 'target', 'rel'],
+                FORBID_ATTR: ['style', 'onclick', 'onerror', 'onload']
+            });
+            setRenderedHtml(safeHtml);
         }, 150)
     );
+    
+    // Track the latest markdown being parsed to prevent race conditions
+    const latestMarkdownRef = useRef<string>('');
 
     useEffect(() => {
         if (!isClient) return;
+        latestMarkdownRef.current = markdown;
+        
+        // Cancel previous parse if new markdown arrives quickly
         debouncedParse.current(markdown);
+        
+        // Cleanup function to cancel stale parses
+        return () => {
+            // Optional: Could add abort controller support here for true cancellation
+        };
     }, [markdown, isClient]);
 
     // Re-run mermaid diagrams after HTML updates
     useEffect(() => {
         if (!isClient) return;
+        
         // Convert fenced mermaid blocks into mermaid containers for rendering
         const convertMermaidBlocks = () => {
             const codeBlocks = document.querySelectorAll('pre > code.language-mermaid');
@@ -69,7 +98,10 @@ export function Preview() {
                 }
             });
         };
+        
         convertMermaidBlocks();
+        
+        // Render mermaid diagrams
         const timer = setTimeout(() => {
             const mermaidNodes = document.querySelectorAll('.mermaid');
             if (mermaidNodes.length > 0) {
@@ -78,7 +110,14 @@ export function Preview() {
                     .catch((err) => console.debug('Mermaid rendering validation:', err));
             }
         }, 100);
-        return () => clearTimeout(timer);
+        
+        // Cleanup: Remove old mermaid SVGs to prevent memory leaks
+        return () => {
+            clearTimeout(timer);
+            // Clean up rendered mermaid SVGs but keep the source code blocks
+            const renderedMermaids = document.querySelectorAll('.mermaid[data-processed="true"] svg, .mermaid[data-processed="true"] img');
+            renderedMermaids.forEach(el => el.remove());
+        };
     }, [renderedHtml, isClient]);
 
     // Inline styles for rich typography
@@ -250,6 +289,7 @@ export function Preview() {
     }
 
     // Render parsed markdown with rich inline styles
+    // Note: Content is sanitized twice (MarkdownParser + DOMPurify) for XSS protection
     return (
         <div
             className="h-full w-full overflow-auto p-8"

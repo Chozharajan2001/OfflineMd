@@ -18,14 +18,30 @@ export class MarkdownParser {
     .use(remarkEmoji as any)
     .use(remarkRehype)
     .use(rehypeSanitize, {
-      tagNames: ['div','p','a','img','table','thead','tbody','tr','th','td','pre','code','ul','ol','li','hr','blockquote','h1','h2','h3','h4','h5','h6','span'],
+      // Strict allowlist for markdown-generated content
+      tagNames: [
+        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'p', 'br', 'hr',
+        'strong', 'b', 'em', 'i', 'del', 's', 'mark',
+        'a', 'img',
+        'ul', 'ol', 'li',
+        'blockquote', 'pre', 'code',
+        'table', 'thead', 'tbody', 'tr', 'th', 'td',
+        'div', 'span', 'details', 'summary',
+        'sup', 'sub',
+        'figure', 'figcaption'
+      ],
       attributes: {
-        '*': ['className', 'class'],
-        'a': ['href', 'title'],
+        '*': ['className', 'class', 'id'],
+        'a': ['href', 'title', 'target', 'rel'],
         'img': ['src', 'alt', 'title'],
-        'th': ['colspan','rowspan'],
-        'td': ['colspan','rowspan']
-      }
+        'th': ['colspan', 'rowspan'],
+        'td': ['colspan', 'rowspan'],
+        'ol': ['start', 'type'],
+        'li': ['value']
+      },
+      // Strip dangerous protocols
+      strip: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'textarea', 'select', 'button']
     })
     .use(rehypeHighlight)
     .use(rehypeStringify);

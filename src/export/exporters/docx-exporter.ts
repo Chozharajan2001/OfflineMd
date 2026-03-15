@@ -58,15 +58,19 @@ class MarkdownParser {
             } else if (line.match(/^\d+\.\s/)) {
                 result.push({ type: 'orderedList', content: line.replace(/^\d+\.\s/, ''), items: [line.replace(/^\d+\.\s/, '')] });
             } else if (line.match(/^\|/) && line.match(/\|$/)) {
+                // Skip markdown table separator rows like |---|---|
+                if (line.match(/^[\s|-]+$/)) {
+                    continue;
+                }
                 const cells = line.split('|').filter((c, idx) => idx !== 0 && idx !== line.split('|').length - 1).map(c => c.trim());
-                if (!line.match(/^[\s|-]+$/)) {
+                if (cells.length > 0) {
                     const tableRow: string[] = [];
                     for (const cell of cells) {
                         tableRow.push(cell);
                     }
                     const lastRow = result[result.length - 1];
-                    if (lastRow && lastRow.type === 'table') {
-                        lastRow.cells?.push(tableRow);
+                    if (lastRow && lastRow.type === 'table' && lastRow.cells) {
+                        lastRow.cells.push(tableRow);
                     } else {
                         result.push({ type: 'table', content: '', cells: [tableRow] });
                     }
@@ -127,10 +131,17 @@ export class DocxExporter implements IExporter {
 
     async export(input: ExportInput): Promise<ExportResult> {
         const start = performance.now();
-        const { markdown, theme } = input;
+        
+        try {
+            const { markdown, theme } = input;
 
-        const parser = new MarkdownParser();
-        const parsed = parser.parse(markdown);
+            // Validate input
+            if (!markdown || typeof markdown !== 'string') {
+                throw new Error('Invalid markdown content');
+            }
+
+            const parser = new MarkdownParser();
+            const parsed = parser.parse(markdown);
 
         const children: any[] = [];
         const accentColor = this.hexToRgb(theme.ui.accent);
@@ -314,7 +325,16 @@ export class DocxExporter implements IExporter {
 
         const buffer = await Packer.toBuffer(doc);
         const blob = new Blob([buffer] as BlobPart[], { type: this.mimeType });
-        const filename = 'document' + this.extension;
+        
+        // Generate filename with timestamp and sanitized title
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const safeTitle = (input.metadata?.title || 'document')
+            .replace(/[^a-z0-9\s\-_]/gi, '_')
+            .replace(/\s+/g, '-')
+            .toLowerCase()
+            .slice(0, 50);
+        const filename = `${safeTitle}_${timestamp}${this.extension}`;
+        
         const duration = performance.now() - start;
 
         return {
@@ -324,6 +344,11 @@ export class DocxExporter implements IExporter {
             size: blob.size,
             duration
         };
+        
+        } catch (error) {
+            console.error('DOCX export failed:', error);
+            throw new Error(`Failed to export DOCX: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
     }
 
     private parseInlineFormatting(text: string, textColor: { r: number; g: number; b: number }, accentColor: { r: number; g: number; b: number }, codeBgColor: { r: number; g: number; b: number }): TextRun[] {

@@ -183,16 +183,16 @@ User Input → Editor Component → Zustand Store → Preview Component → Rend
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+We welcome contributions! Please see [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) for guidelines.
 
 ---
 
 ## Documentation
 
-- [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) - Comprehensive developer documentation
-- [TECHNICAL_DOCS.md](./TECHNICAL_DOCS.md) - Technical architecture details
-- [QUICK_START.md](./QUICK_START.md) - Rapid setup guide
-- [CONTRIBUTING.md](./CONTRIBUTING.md) - Contribution guidelines
+- [docs/DEVELOPER_GUIDE.md](./docs/DEVELOPER_GUIDE.md) - Comprehensive developer documentation
+- [docs/TECHNICAL_DOCS.md](./docs/TECHNICAL_DOCS.md) - Technical architecture details
+- [docs/QUICK_START.md](./docs/QUICK_START.md) - Rapid setup guide
+- [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) - Contribution guidelines
 
 ---
 

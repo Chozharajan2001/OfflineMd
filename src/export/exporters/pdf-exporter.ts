@@ -176,7 +176,12 @@ export class PdfExporter implements IExporter {
 
     supportsTheme = true;
     supportsEditing = false;
-    supportsImages: boolean = true;
+    /**
+     * ⚠️ LIMITATION: Currently text-only. Images in markdown are NOT rendered to PDF.
+     * This is due to pdf-lib's complexity with image embedding and encoding.
+     * Future enhancement: Implement image download and embedding via PDFDocument.embedJpg/Png
+     */
+    supportsImages: boolean = false;
 
     async export(input: ExportInput): Promise<ExportResult> {
         const start = performance.now();

@@ -245,7 +245,10 @@ export class DocxExporter implements IExporter {
                             children.push(
                                 new Paragraph({
                                     text: item,
-                                    bullet: { level: 0 },
+                                    numbering: {
+                                        reference: 'bullet-list',
+                                        level: 0
+                                    },
                                     spacing: { before: 50, after: 50 },
                                     indent: { left: 720 }
                                 })
@@ -315,6 +318,32 @@ export class DocxExporter implements IExporter {
         }
 
         const doc = new Document({
+            numbering: {
+                config: [
+                    {
+                        reference: 'ordered-list',
+                        levels: [
+                            {
+                                level: 0,
+                                format: 'decimal',
+                                text: '%1.',
+                                alignment: 'left'
+                            }
+                        ]
+                    },
+                    {
+                        reference: 'bullet-list',
+                        levels: [
+                            {
+                                level: 0,
+                                format: 'bullet',
+                                text: '•',
+                                alignment: 'left'
+                            }
+                        ]
+                    }
+                ]
+            },
             sections: [
                 {
                     properties: {},

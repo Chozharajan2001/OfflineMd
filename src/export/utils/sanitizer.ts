@@ -46,16 +46,12 @@ export async function sanitizeHTML(html: string): Promise<string> {
       'oncontextmenu', 'ondrag', 'ondrop', 'oninput', 'oninvalid', 'onsearch', 'onselect', 'onwheel'
     ],
     
-    // Allow data-* attributes for mermaid diagrams and other legitimate uses
-    ADD_DATA: ['*'],
-    
     // Force safe link targets
     ADD_ATTR: ['target'],
-    FORCE_URI: true,
     
     // Handle embedded content safely
     USE_PROFILES: {
-      htmlMime: true,
+      html: true,
       svg: false,        // Block SVG (can contain scripts)
       svgFilters: false, // Block SVG filters
       mathMl: false      // Block MathML

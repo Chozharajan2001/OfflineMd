@@ -326,13 +326,26 @@ export class DocxExporter implements IExporter {
         const buffer = await Packer.toBuffer(doc);
         const blob = new Blob([buffer] as BlobPart[], { type: this.mimeType });
         
-        // Generate filename with timestamp and sanitized title
+        // Generate filename with timestamp and extracted/sanitized title
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-        const safeTitle = (input.metadata?.title || 'document')
-            .replace(/[^a-z0-9\s\-_]/gi, '_')
-            .replace(/\s+/g, '-')
+        
+        // Extract title from first H1 heading if not in metadata
+        let baseTitle = input.metadata?.title || 'document';
+        if (!input.metadata?.title) {
+            const titleMatch = input.markdown.match(/^#\s+(.*)/m);
+            if (titleMatch && titleMatch[1]) {
+                baseTitle = titleMatch[1].trim();
+            }
+        }
+        
+        // Sanitize title: remove invalid filename chars and limit length
+        const safeTitle = baseTitle
+            .replace(/[\\/:*?"<>|]/g, '_')  // Remove Windows-invalid chars
+            .replace(/[^a-z0-9\s\-_]/gi, '_') // Remove other special chars
+            .replace(/\s+/g, '-')              // Spaces to dashes
             .toLowerCase()
-            .slice(0, 50);
+            .slice(0, 50);                     // Max 50 chars
+        
         const filename = `${safeTitle}_${timestamp}${this.extension}`;
         
         const duration = performance.now() - start;

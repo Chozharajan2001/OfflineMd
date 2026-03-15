@@ -33,11 +33,23 @@ export function Preview() {
     // Initialize mermaid when theme changes and after client detection
     useEffect(() => {
         if (!isClient) return;
-        mermaid.initialize({
-            startOnLoad: false,
-            theme: theme.preview.background === '#ffffff' ? 'default' : 'dark',
-            securityLevel: 'loose',
-        });
+        
+        // Initialize mermaid only once globally to prevent re-registration
+        if (!(window as any).mermaidInitialized) {
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: theme.preview.background === '#ffffff' ? 'default' : 'dark',
+                securityLevel: 'loose',
+            });
+            (window as any).mermaidInitialized = true;
+        } else {
+            // Update theme on existing instance
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: theme.preview.background === '#ffffff' ? 'default' : 'dark',
+                securityLevel: 'loose',
+            });
+        }
     }, [isClient, theme]);
 
     // Debounced markdown parsing with sanitization

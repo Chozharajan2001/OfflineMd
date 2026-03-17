@@ -15,8 +15,8 @@ export function Editor() {
     // Show loading state during SSR/hydration
     if (!isClient) {
         return (
-            <div className="h-full w-full flex items-center justify-center bg-gray-900">
-                <div className="text-gray-500">Loading editor...</div>
+            <div className="h-full w-full flex items-center justify-center bg-[var(--editor-bg)]">
+                <div className="text-[var(--sidebar-muted)]">Loading editor...</div>
             </div>
         );
     }

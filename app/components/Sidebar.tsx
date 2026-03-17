@@ -80,11 +80,11 @@ export function Sidebar() {
             return (
                 <div className="pl-2">
                     <div
-                        className="flex items-center gap-1 p-1 hover:bg-gray-800 rounded cursor-pointer text-gray-300"
+                        className="flex items-center gap-1 p-1 hover:bg-[var(--sidebar-hover)] rounded cursor-pointer text-[var(--sidebar-fg)]"
                         onClick={() => setExpandedFolders(prev => ({ ...prev, [node.id!]: !prev[node.id!] }))}
                     >
                         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        <Folder size={14} className="text-blue-400" />
+                        <Folder size={14} className="text-[var(--accent)]" />
                         <span className="text-sm">{node.name}</span>
                         <div className="ml-auto flex gap-1 opacity-0 group-hover:opacity-100">
                             <button onClick={(e) => { e.stopPropagation(); createNode('file', node.id); }} title="New File"><FilePlus size={12} /></button>
@@ -97,7 +97,7 @@ export function Sidebar() {
 
         return (
             <div
-                className={`flex items-center gap-2 p-1 pl-4 hover:bg-gray-800 rounded cursor-pointer text-sm ${activeFileId === node.id ? 'bg-gray-800 text-white font-medium' : 'text-gray-400'}`}
+                className={`flex items-center gap-2 p-1 pl-4 hover:bg-[var(--sidebar-hover)] rounded cursor-pointer text-sm ${activeFileId === node.id ? 'bg-[var(--sidebar-hover)] text-[var(--sidebar-fg)] font-medium' : 'text-[var(--sidebar-muted)]'}`}
                 onClick={() => loadFile(node.id!)}
             >
                 <FileText size={14} />
@@ -133,14 +133,14 @@ export function Sidebar() {
 
         const recentFiles = recents.slice(0, 5);
 
-        if (recentFiles.length === 0) return <div className="text-gray-600 text-xs italic">No recent files</div>;
+        if (recentFiles.length === 0) return <div className="text-[var(--sidebar-muted)] text-xs italic">No recent files</div>;
 
         return (
             <div className="space-y-1">
                 {recentFiles.map(file => (
                     <div
                         key={file.id}
-                        className="flex items-center gap-2 p-1 hover:bg-gray-800 rounded cursor-pointer text-xs text-gray-400"
+                        className="flex items-center gap-2 p-1 hover:bg-[var(--sidebar-hover)] rounded cursor-pointer text-xs text-[var(--sidebar-muted)]"
                         onClick={() => {
                             if (file.projectId) setActiveProject(file.projectId);
                             loadFile(file.id!);
@@ -155,15 +155,15 @@ export function Sidebar() {
     };
 
     return (
-        <div className="h-full bg-gray-900 border-r border-gray-800 flex flex-col w-64">
+        <div className="h-full bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] flex flex-col w-64">
             {/* Projects Dropdown / Header */}
-            <div className="p-3 border-b border-gray-800">
+            <div className="p-3 border-[var(--sidebar-border)]">
                 <div className="flex justify-between items-center mb-2">
-                    <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Projects</h2>
-                    <button onClick={createProject} className="text-gray-400 hover:text-white"><Plus size={14} /></button>
+                    <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider">Projects</h2>
+                    <button onClick={createProject} className="text-[var(--sidebar-icon)] hover:text-[var(--sidebar-fg)]"><Plus size={14} /></button>
                 </div>
                 <select
-                    className="w-full bg-gray-800 text-white text-sm rounded p-1 border border-gray-700"
+                    className="w-full bg-[var(--sidebar-input-bg)] text-[var(--sidebar-fg)] text-sm rounded p-1 border border-[var(--sidebar-border)]"
                     value={activeProjectId || ''}
                     onChange={(e) => setActiveProject(Number(e.target.value))}
                 >
@@ -173,8 +173,8 @@ export function Sidebar() {
             </div>
 
             {/* Recents */}
-            <div className="p-3 border-b border-gray-800">
-                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Recents</h2>
+            <div className="p-3 border-[var(--sidebar-border)]">
+                <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider mb-2">Recents</h2>
                 {/* We need a separate component or query for Recents to avoid hooks rules issues if we put useLiveQuery conditionally */}
                 <RecentsList />
             </div>
@@ -184,16 +184,16 @@ export function Sidebar() {
                 {activeProjectId ? (
                     <>
                         <div className="flex justify-between items-center px-2 mb-2">
-                            <span className="text-xs text-gray-500">Explorer</span>
+                            <span className="text-xs text-[var(--sidebar-muted)]">Explorer</span>
                             <div className="flex gap-1">
-                                <button onClick={() => createNode('folder')} title="New Folder"><FolderPlus size={14} className="text-gray-400" /></button>
-                                <button onClick={() => createNode('file')} title="New File"><FilePlus size={14} className="text-gray-400" /></button>
+                                <button onClick={() => createNode('folder')} title="New Folder"><FolderPlus size={14} className="text-[var(--sidebar-icon)]" /></button>
+                                <button onClick={() => createNode('file')} title="New File"><FilePlus size={14} className="text-[var(--sidebar-icon)]" /></button>
                             </div>
                         </div>
                         <NodeList parentId={null} />
                     </>
                 ) : (
-                    <div className="text-gray-500 text-center text-sm mt-10">Select a project to view files</div>
+                    <div className="text-[var(--sidebar-muted)] text-center text-sm mt-10">Select a project to view files</div>
                 )}
             </div>
         </div>

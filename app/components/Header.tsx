@@ -91,19 +91,19 @@ export function Header() {
     };
 
     return (
-        <header className="bg-gray-800 text-white p-4 flex justify-between items-center border-b border-gray-700">
+        <header className="bg-[var(--header-bg)] text-[var(--header-fg)] p-4 flex justify-between items-center border-b border-[var(--header-border)]">
             <h1 className="text-xl font-bold tracking-tight">Markdown Converter</h1>
             <div className="flex gap-2 items-center">
                 {/* File Operations */}
-                <div className="flex gap-1 border-r border-gray-600 pr-2 mr-2">
-                    <button onClick={handleSave} className="p-2 hover:bg-gray-700 rounded transition-colors" title="Save Document">
+                <div className="flex gap-1 border-[var(--header-border)] pr-2 mr-2">
+                    <button onClick={handleSave} className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors" title="Save Document">
                         <Save className="w-5 h-5" />
                     </button>
                     {/* Load button removed/redirected as Sidebar handles navigation */}
-                    {/* <button onClick={handleLoad} className="p-2 hover:bg-gray-700 rounded transition-colors" title="Load Document">
+                    {/* <button onClick={handleLoad} className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors" title="Load Document">
                         <FolderOpen className="w-5 h-5" />
                     </button> */}
-                    <label className="p-2 hover:bg-gray-700 rounded transition-colors cursor-pointer" title="Import File">
+                    <label className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors cursor-pointer" title="Import File">
                         <Upload className="w-5 h-5" />
                         <input type="file" accept=".md,.txt" onChange={handleImport} className="hidden" />
                     </label>
@@ -155,12 +155,12 @@ export function Header() {
                         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
                         <Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-900 border border-gray-700 text-white p-6 rounded-lg shadow-xl max-w-md w-full">
                             <Dialog.Title className="text-lg font-semibold mb-4">Theme Settings</Dialog.Title>
-
+                            
                             <div className="space-y-6">
                                 <div>
-                                    <h3 className="font-medium text-gray-400 text-sm uppercase tracking-wider mb-2">Presets</h3>
+                                    <h3 className="font-medium text-[var(--sidebar-muted)] text-sm uppercase tracking-wider mb-2">Presets</h3>
                                     <select
-                                        className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-2 text-white"
+                                        className="w-full bg-[var(--sidebar-input-bg)] border border-[var(--sidebar-border)] rounded px-2 py-2 text-[var(--sidebar-fg)]"
                                         onChange={(e) => applyPreset(e.target.value)}
                                         value={Object.keys(themes).find(key => themes[key].name === theme.name) || ''}
                                     >
@@ -170,9 +170,9 @@ export function Header() {
                                         ))}
                                     </select>
                                 </div>
-
+                            
                                 <div>
-                                    <h3 className="font-medium text-gray-400 text-sm uppercase tracking-wider mb-2">Editor</h3>
+                                    <h3 className="font-medium text-[var(--sidebar-muted)] text-sm uppercase tracking-wider mb-2">Editor</h3>
                                     <div className="grid grid-cols-2 gap-4">
                                         <label className="text-sm">
                                             Font Size
@@ -180,20 +180,20 @@ export function Header() {
                                                 type="number"
                                                 value={theme.editor.fontSize}
                                                 onChange={(e) => setTheme({ ...theme, editor: { ...theme.editor, fontSize: parseInt(e.target.value) } })}
-                                                className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 mt-1"
+                                                className="w-full bg-[var(--sidebar-input-bg)] border border-[var(--sidebar-border)] rounded px-2 py-1 mt-1 text-[var(--sidebar-fg)]"
                                             />
                                         </label>
                                     </div>
                                 </div>
                                 <button
                                     onClick={resetTheme}
-                                    className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded transition-colors font-medium"
+                                    className="w-full bg-[var(--button-primary-bg)] hover:bg-[var(--button-primary-hover)] text-[var(--button-fg)] py-2 rounded transition-colors font-medium"
                                 >
                                     Reset to Defaults
                                 </button>
                             </div>
                             <Dialog.Close asChild>
-                                <button className="absolute top-4 right-4 p-1 hover:bg-gray-800 rounded">×</button>
+                                <button className="absolute top-4 right-4 p-1 hover:bg-[var(--sidebar-hover)] rounded text-[var(--sidebar-fg)]">×</button>
                             </Dialog.Close>
                         </Dialog.Content>
                     </Dialog.Portal>

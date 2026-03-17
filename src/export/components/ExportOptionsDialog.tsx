@@ -38,8 +38,8 @@ export function ExportOptionsDialog({
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 bg-black/50" />
-                <Dialog.Content className="fixed top-1/2 left-1/2 w-[340px] max-w-full -translate-x-1/2 -translate-y-1/2 bg-gray-900 border border-gray-700 rounded p-4 text-white">
+                <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+                <Dialog.Content className="fixed top-1/2 left-1/2 w-[340px] max-w-full -translate-x-1/2 -translate-y-1/2 bg-[var(--dialog-bg)] border border-[var(--dialog-border)] rounded p-4 text-[var(--dialog-fg)]">
                     <Dialog.Title className="text-lg font-medium mb-3">
                         Export Options – {format.toUpperCase()}
                     </Dialog.Title>
@@ -69,7 +69,7 @@ export function ExportOptionsDialog({
                                 onChange={e =>
                                     setOption('pageSize', e.target.value as any)
                                 }
-                                className="bg-gray-800 border border-gray-600 text-white p-1"
+                                className="bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-fg)] p-1 rounded"
                             >
                                 <option value="A4">A4</option>
                                 <option value="Letter">Letter</option>
@@ -83,7 +83,7 @@ export function ExportOptionsDialog({
                                 onChange={e =>
                                     setOption('orientation', e.target.value as any)
                                 }
-                                className="bg-gray-800 border border-gray-600 text-white p-1"
+                                className="bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-fg)] p-1 rounded"
                             >
                                 <option value="portrait">Portrait</option>
                                 <option value="landscape">Landscape</option>
@@ -93,7 +93,7 @@ export function ExportOptionsDialog({
                     <div className="mt-4 flex justify-end gap-2">
                         <button
                             onClick={() => onOpenChange(false)}
-                            className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600"
+                            className="px-3 py-1 bg-[var(--button-secondary-bg)] rounded hover:bg-[var(--button-secondary-hover)] text-[var(--button-fg)]"
                         >
                             Cancel
                         </button>
@@ -102,7 +102,7 @@ export function ExportOptionsDialog({
                                 onExport(format, options);
                                 onOpenChange(false);
                             }}
-                            className="px-3 py-1 bg-blue-600 rounded hover:bg-blue-500"
+                            className="px-3 py-1 bg-[var(--button-primary-bg)] rounded hover:bg-[var(--button-primary-hover)] text-[var(--button-fg)]"
                         >
                             Export
                         </button>

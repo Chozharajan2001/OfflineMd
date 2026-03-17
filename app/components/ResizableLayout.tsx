@@ -17,7 +17,7 @@ export function ResizableLayout() {
                     <Editor />
                 </Panel>
 
-                <Separator className="w-2 bg-gray-800 hover:bg-blue-600 transition-colors" />
+                <Separator className="w-2 bg-[var(--sidebar-border)] hover:bg-[var(--accent)] transition-colors" />
 
                 <Panel defaultSize={50} minSize={20}>
                     <Preview />

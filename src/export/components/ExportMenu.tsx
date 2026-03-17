@@ -20,14 +20,14 @@ export function ExportMenu({ onSelect }: ExportMenuProps) {
     return (
         <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-                <button className="p-2 hover:bg-gray-700 rounded transition-colors" title="Export">
+                <button className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors" title="Export">
                     <Download className="w-5 h-5" />
                 </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-                <DropdownMenu.Content className="bg-gray-800 border border-gray-700 rounded p-2 shadow-lg min-w-[200px]" sideOffset={5}>
+                <DropdownMenu.Content className="bg-[var(--dropdown-bg)] border border-[var(--dropdown-border)] rounded p-2 shadow-lg min-w-[200px]" sideOffset={5}>
                     {formats.map((f) => (
-                        <DropdownMenu.Item key={f.format} onSelect={() => onSelect(f.format)} className="flex items-center gap-2 p-1 hover:bg-gray-700 cursor-pointer">
+                        <DropdownMenu.Item key={f.format} onSelect={() => onSelect(f.format)} className="flex items-center gap-2 p-1 hover:bg-[var(--dropdown-hover)] cursor-pointer text-[var(--dropdown-fg)]">
                             {f.icon}
                             <span className="text-sm">{f.label}</span>
                         </DropdownMenu.Item>

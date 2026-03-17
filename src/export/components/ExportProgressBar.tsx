@@ -25,14 +25,14 @@ export function ExportProgressBar({
 
     return (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-            <div className="bg-gray-800 border border-gray-700 rounded p-6 text-center text-white shadow-lg w-64">
+            <div className="bg-[var(--dialog-bg)] border border-[var(--dialog-border)] rounded p-6 text-center text-[var(--dialog-fg)] shadow-lg w-64">
                 {/* Spin animation – a simple circular loader */}
-                <div className="animate-spin rounded-full border-4 border-t-4 border-gray-500 border-t-white h-12 w-12 mx-auto mb-4" />
+                <div className="animate-spin rounded-full border-4 border-t-4 border-[var(--sidebar-border)] border-t-[var(--accent)] h-12 w-12 mx-auto mb-4" />
                 <p>{message}</p>
                 {onCancel && (
                     <button
                         onClick={onCancel}
-                        className="mt-4 px-4 py-2 bg-red-600 rounded hover:bg-red-500"
+                        className="mt-4 px-4 py-2 bg-[var(--button-primary-bg)] rounded hover:bg-[var(--button-primary-hover)] text-[var(--button-fg)]"
                     >
                         Cancel
                     </button>

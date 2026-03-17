@@ -21,6 +21,7 @@ export function Preview() {
     const { markdown, theme } = useMarkdownStore();
     const [renderedHtml, setRenderedHtml] = useState('');
     const [isClient, setIsClient] = useState(false);
+    const previewRef = useRef<HTMLDivElement>(null);
 
     // Detect client-side rendering after mount
     useEffect(() => {
@@ -93,6 +94,21 @@ export function Preview() {
     }, [markdown, isClient]);
 
     // Re-run mermaid diagrams after HTML updates
+    useEffect(() => {
+        if (!isClient) return;
+        
+        // Sync scrolling - listen to editor scroll events
+        const handleEditorScroll = (e: CustomEvent<{ scrollPercentage: number }>) => {
+            if (previewRef.current) {
+                const scrollHeight = previewRef.current.scrollHeight - previewRef.current.clientHeight;
+                previewRef.current.scrollTop = e.detail.scrollPercentage * scrollHeight;
+            }
+        };
+        
+        window.addEventListener('editor-scroll' as any, handleEditorScroll as any);
+        return () => window.removeEventListener('editor-scroll' as any, handleEditorScroll as any);
+    }, [isClient]);
+    
     useEffect(() => {
         if (!isClient) return;
         

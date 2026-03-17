@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import MonacoEditor from '@monaco-editor/react';
 import { useMarkdownStore } from '../store';
 
@@ -9,6 +9,7 @@ export function Editor() {
     const [isClient, setIsClient] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
+    const editorRef = useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
         setIsClient(true);
@@ -66,6 +67,16 @@ export function Editor() {
                     padding: { top: 16, bottom: 16 },
                     fontFamily: "'Fira Code', 'Cascadia Code', Consolas, monospace",
                     fontLigatures: true,
+                }}
+                onMount={(editor) => {
+                    // Add scroll sync event listener
+                    const container = editor.getContainerDomNode();
+                    container?.addEventListener('scroll', () => {
+                        const scrollPercentage = container.scrollTop / Math.max(1, container.scrollHeight - container.clientHeight);
+                        window.dispatchEvent(new CustomEvent('editor-scroll', { 
+                            detail: { scrollPercentage } 
+                        }));
+                    });
                 }}
             />
         </div>

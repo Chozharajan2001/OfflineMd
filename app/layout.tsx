@@ -23,15 +23,16 @@ export const metadata: Metadata = {
         statusBarStyle: "black-translucent",
         title: "MD Editor",
     },
-    viewport: {
-        width: "device-width",
-        initialScale: 1,
-        maximumScale: 1,
-        userScalable: false // Prevent zooming on mobile for app-like feel
-    },
     icons: {
         icon: "/favicon.ico",
     }
+};
+
+export const viewport = {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false // Prevent zooming on mobile for app-like feel
 };
 
 export default function RootLayout({

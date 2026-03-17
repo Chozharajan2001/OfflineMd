@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Settings, Save, FolderOpen, Upload, Download } from 'lucide-react';
+import { Settings, Save, FolderOpen, Upload, Download, Menu } from 'lucide-react';
 import { useMarkdownStore, themes } from '../store';
 import { ExportOrchestrator } from '../../src/export/export-service';
 import type { ExportFormat, ExportOptions } from '../../src/export/types';
@@ -22,6 +22,7 @@ export function Header() {
     const [exportFormat, setExportFormat] = useState<ExportFormat | null>(null);
     const [optionsOpen, setOptionsOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
+    const [exportProgress, setExportProgress] = useState<number | undefined>(undefined);
 
     const handleSave = async () => {
         if (activeFileId) {
@@ -92,7 +93,22 @@ export function Header() {
 
     return (
         <header className="bg-[var(--header-bg)] text-[var(--header-fg)] p-4 flex justify-between items-center border-b border-[var(--header-border)]">
-            <h1 className="text-xl font-bold tracking-tight">Markdown Converter</h1>
+            {/* Left: Hamburger + Title */}
+            <div className="flex items-center gap-3">
+                {/* Mobile hamburger menu */}
+                <button
+                    className="lg:hidden p-2 hover:bg-[var(--header-hover)] rounded transition-colors"
+                    onClick={() => {
+                        const event = new CustomEvent('toggle-sidebar');
+                        window.dispatchEvent(event);
+                    }}
+                    title="Toggle Sidebar"
+                >
+                    <Menu className="w-5 h-5" />
+                </button>
+                
+                <h1 className="text-xl font-bold tracking-tight">Markdown Converter</h1>
+            </div>
             <div className="flex gap-2 items-center">
                 {/* File Operations */}
                 <div className="flex gap-1 border-[var(--header-border)] pr-2 mr-2">
@@ -124,25 +140,37 @@ export function Header() {
                     format={exportFormat}
                     onExport={async (format, options) => {
                         setExporting(true);
+                        setExportProgress(0);
                         try {
                             const { markdown, theme } = useMarkdownStore.getState();
+                            let currentProgress = 0;
+                            
                             const input = {
                                 markdown,
                                 ast: undefined,
                                 theme: theme as any,
                                 options,
-                                metadata: {}
+                                metadata: {},
+                                onProgress: (progress: number) => {
+                                    currentProgress = progress;
+                                    setExportProgress(progress);
+                                }
                             };
                             const result = await ExportOrchestrator.export(format, input);
                             await triggerDownload(result.blob, result.filename);
                         } finally {
                             setExporting(false);
+                            setExportProgress(undefined);
                         }
                     }}
                 />
 
                 {/* Export progress overlay */}
-                <ExportProgressBar visible={exporting} />
+                <ExportProgressBar 
+                    visible={exporting} 
+                    progress={exportProgress}
+                    message={exportProgress ? `Exporting... ${Math.round(exportProgress)}%` : 'Exporting...'}
+                />
 
                 {/* Settings */}
                 <Dialog.Root open={settingsOpen} onOpenChange={setSettingsOpen}>

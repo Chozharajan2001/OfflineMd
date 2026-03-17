@@ -15,6 +15,14 @@ export function Sidebar() {
 
     const projects = useLiveQuery(() => db.projects.toArray()) || [];
     const [expandedFolders, setExpandedFolders] = useState<Record<number, boolean>>({});
+    const [isMobileOpen, setIsMobileOpen] = useState(false); // Mobile state
+
+    // Listen for toggle-sidebar event from Header
+    useEffect(() => {
+        const handleToggle = () => setIsMobileOpen(prev => !prev);
+        window.addEventListener('toggle-sidebar', handleToggle);
+        return () => window.removeEventListener('toggle-sidebar', handleToggle);
+    }, []);
 
     // -- CRUD Operations --
 
@@ -155,8 +163,32 @@ export function Sidebar() {
     };
 
     return (
-        <div className="h-full bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] flex flex-col w-64">
-            {/* Projects Dropdown / Header */}
+        <>
+            {/* Mobile overlay */}
+            {isMobileOpen && (
+                <div 
+                    className="fixed inset-0 bg-[var(--overlay-bg)] z-40 lg:hidden"
+                    onClick={() => setIsMobileOpen(false)}
+                />
+            )}
+            
+            {/* Sidebar with responsive classes */}
+            <div className={`
+                h-full bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] flex flex-col
+                fixed lg:static top-0 left-0 z-50
+                transform transition-transform duration-300 ease-in-out
+                ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                w-64 lg:w-64
+            `}>
+                {/* Mobile close button */}
+                <button 
+                    className="lg:hidden absolute top-2 right-2 text-[var(--sidebar-icon)] hover:text-[var(--sidebar-fg)] z-50"
+                    onClick={() => setIsMobileOpen(false)}
+                >
+                    <Trash2 size={16} />
+                </button>
+                
+                {/* Projects Dropdown / Header */}
             <div className="p-3 border-[var(--sidebar-border)]">
                 <div className="flex justify-between items-center mb-2">
                     <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider">Projects</h2>
@@ -197,5 +229,6 @@ export function Sidebar() {
                 )}
             </div>
         </div>
+        </>
     );
 }

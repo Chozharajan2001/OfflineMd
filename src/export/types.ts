@@ -47,6 +47,7 @@ export interface ExportInput {
     theme: ThemeTokens;          // Active theme tokens
     options: ExportOptions;      // User‑specified export options
     metadata: DocumentMetadata; // Document metadata (title, author, date, etc.)
+    onProgress?: (progress: number) => void; // Optional progress callback (0-100)
 }
 
 /**

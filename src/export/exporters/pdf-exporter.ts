@@ -9,11 +9,13 @@ interface TextRun {
 }
 
 interface ParsedLine {
-    type: 'heading1' | 'heading2' | 'heading3' | 'heading4' | 'paragraph' | 'code' | 'blockquote' | 'list' | 'orderedList' | 'tableRow' | 'hr' | 'empty';
+    type: 'heading1' | 'heading2' | 'heading3' | 'heading4' | 'paragraph' | 'code' | 'blockquote' | 'list' | 'orderedList' | 'tableRow' | 'hr' | 'empty' | 'image';
     content?: string;
     runs?: TextRun[];
     items?: string[];
     cells?: string[];
+    imageUrl?: string; // For image type
+    altText?: string;  // Alt text for image
 }
 
 class MarkdownParser {
@@ -65,6 +67,16 @@ class MarkdownParser {
                 result.push({ type: 'hr' });
             } else if (line.trim() === '') {
                 result.push({ type: 'empty' });
+            } else if (line.match(/^!\[([^\]]*)\]\(([^)]+)\)/)) {
+                // Parse image syntax: ![alt text](url)
+                const match = line.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
+                if (match) {
+                    result.push({ 
+                        type: 'image', 
+                        imageUrl: match[2],
+                        altText: match[1]
+                    });
+                }
             } else {
                 result.push({ type: 'paragraph', runs: this.parseInlineFormatting(line) });
             }
@@ -177,17 +189,16 @@ export class PdfExporter implements IExporter {
     supportsTheme = true;
     supportsEditing = false;
     /**
-     * ⚠️ LIMITATION: Currently text-only. Images in markdown are NOT rendered to PDF.
-     * This is due to pdf-lib's complexity with image embedding and encoding.
-     * Future enhancement: Implement image download and embedding via PDFDocument.embedJpg/Png
+     * ✅ NOW SUPPORTS IMAGES!
+     * Embeds PNG and JPG images from markdown. Handles CORS and unsupported formats gracefully.
      */
-    supportsImages: boolean = false;
+    supportsImages: boolean = true;
 
     async export(input: ExportInput): Promise<ExportResult> {
         const start = performance.now();
         
         try {
-            const { markdown, theme, options } = input;
+            const { markdown, theme, options, onProgress } = input;
 
             // Validate input
             if (!markdown || typeof markdown !== 'string') {
@@ -230,8 +241,17 @@ export class PdfExporter implements IExporter {
 
         const parser = new MarkdownParser();
         const parsed = parser.parse(markdown);
+        const totalLines = parsed.length;
+        let processedLines = 0;
 
         for (const line of parsed) {
+            // Report progress
+            processedLines++;
+            const progress = (processedLines / totalLines) * 100;
+            if (onProgress && processedLines % 10 === 0) { // Update every 10 lines
+                onProgress(progress);
+            }
+            
             if (y < margin + 50) {
                 page = pdfDoc.addPage();
                 page.setSize(pageWidth, pageHeight);
@@ -416,6 +436,97 @@ export class PdfExporter implements IExporter {
                         color: rgb(textCol.r * 0.5, textCol.g * 0.5, textCol.b * 0.5)
                     });
                     y -= fontSize;
+                    break;
+
+                case 'image':
+                    // Embed image in PDF
+                    if (line.imageUrl) {
+                        try {
+                            // Fetch image data
+                            const response = await fetch(line.imageUrl);
+                            const arrayBuffer = await response.arrayBuffer();
+                            
+                            // Determine image type and embed
+                            let embeddedImage;
+                            const contentType = response.headers.get('content-type');
+                            
+                            if (contentType?.includes('png')) {
+                                embeddedImage = await pdfDoc.embedPng(arrayBuffer);
+                            } else if (contentType?.includes('jpeg') || contentType?.includes('jpg')) {
+                                embeddedImage = await pdfDoc.embedJpg(arrayBuffer);
+                            } else {
+                                // Try PNG as fallback
+                                try {
+                                    embeddedImage = await pdfDoc.embedPng(arrayBuffer);
+                                } catch {
+                                    console.warn('Unsupported image format:', line.imageUrl);
+                                    // Draw alt text instead
+                                    page.drawText(`[Image: ${line.altText || 'No description'}]`, {
+                                        x: margin,
+                                        y: y - fontSize,
+                                        size: fontSize,
+                                        font: helveticaOblique,
+                                        color: rgb(textCol.r * 0.6, textCol.g * 0.6, textCol.b * 0.6)
+                                    });
+                                    y -= fontSize * 2;
+                                    break;
+                                }
+                            }
+                            
+                            // Calculate dimensions to fit page width
+                            const imageScale = Math.min(1, contentWidth / embeddedImage.width);
+                            const imgWidth = embeddedImage.width * imageScale;
+                            const imgHeight = embeddedImage.height * imageScale;
+                            
+                            // Check if we need a new page
+                            if (y - imgHeight < margin) {
+                                page = pdfDoc.addPage();
+                                page.setSize(pageWidth, pageHeight);
+                                y = pageHeight - margin;
+                            }
+                            
+                            // Draw image centered
+                            page.drawImage(embeddedImage, {
+                                x: margin + (contentWidth - imgWidth) / 2,
+                                y: y - imgHeight,
+                                width: imgWidth,
+                                height: imgHeight,
+                            });
+                            
+                            // Add alt text below image if exists
+                            if (line.altText) {
+                                page.drawText(line.altText, {
+                                    x: margin,
+                                    y: y - imgHeight - fontSize - 5,
+                                    size: fontSize * 0.9,
+                                    font: helveticaOblique,
+                                    color: rgb(textCol.r * 0.7, textCol.g * 0.7, textCol.b * 0.7)
+                                });
+                                y -= imgHeight + fontSize * 2.5;
+                            } else {
+                                y -= imgHeight + fontSize;
+                            }
+                        } catch (error) {
+                            console.warn('Failed to load image:', line.imageUrl, error);
+                            // Draw placeholder for failed images
+                            page.drawRectangle({
+                                x: margin,
+                                y: y - 50,
+                                width: contentWidth,
+                                height: 50,
+                                borderColor: rgb(textCol.r * 0.3, textCol.g * 0.3, textCol.b * 0.3),
+                                borderWidth: 1,
+                            });
+                            page.drawText(`[Image failed to load: ${line.altText || line.imageUrl}]`, {
+                                x: margin + 10,
+                                y: y - 30,
+                                size: fontSize * 0.85,
+                                font: helveticaOblique,
+                                color: rgb(textCol.r * 0.5, textCol.g * 0.5, textCol.b * 0.5)
+                            });
+                            y -= 60;
+                        }
+                    }
                     break;
 
                 case 'empty':

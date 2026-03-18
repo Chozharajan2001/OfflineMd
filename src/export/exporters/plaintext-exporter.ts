@@ -70,7 +70,7 @@ class MarkdownToPlainText {
                 result.push('---');
                 result.push('');
             } else if (line.trim() !== '') {
-                let text = line
+                const text = line
                     .replace(/\*\*([^*]+)\*\*/g, '$1')
                     .replace(/\*([^*]+)\*/g, '$1')
                     .replace(/__([^_]+)__/g, '$1')
@@ -80,7 +80,7 @@ class MarkdownToPlainText {
                     .replace(/!\[([^\]]*)\]\([^)]+\)/g, '[Image: $1]')
                     .replace(/^(\s)*[-*+]\s/g, '$1• ')
                     .replace(/^(\s)*\d+\.\s/g, '$1');
-                
+
                 if (text.trim()) {
                     result.push(text);
                 }
@@ -114,40 +114,40 @@ export class PlaintextExporter implements IExporter {
             const converter = new MarkdownToPlainText();
             const plainText = converter.convert(input.markdown);
 
-        const blob = new Blob([plainText], { type: this.mimeType });
-        
-        // Generate filename with timestamp and extracted/sanitized title
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-        
-        // Extract title from first H1 heading if not in metadata
-        let baseTitle = input.metadata?.title || 'document';
-        if (!input.metadata?.title) {
-            const titleMatch = input.markdown.match(/^#\s+(.*)/m);
-            if (titleMatch && titleMatch[1]) {
-                baseTitle = titleMatch[1].trim();
-            }
-        }
-        
-        // Sanitize title: remove invalid filename chars and limit length
-        const safeTitle = baseTitle
-            .replace(/[\\/:*?"<>|]/g, '_')  // Remove Windows-invalid chars
-            .replace(/[^a-z0-9\s\-_]/gi, '_') // Remove other special chars
-            .replace(/\s+/g, '-')              // Spaces to dashes
-            .toLowerCase()
-            .slice(0, 50);                     // Max 50 chars
-        
-        const filename = `${safeTitle}_${timestamp}${this.extension}`;
-        
-        const duration = performance.now() - start;
+            const blob = new Blob([plainText], { type: this.mimeType });
 
-        return {
-            blob,
-            filename,
-            mimeType: this.mimeType,
-            size: blob.size,
-            duration
-        };
-        
+            // Generate filename with timestamp and extracted/sanitized title
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+
+            // Extract title from first H1 heading if not in metadata
+            let baseTitle = input.metadata?.title || 'document';
+            if (!input.metadata?.title) {
+                const titleMatch = input.markdown.match(/^#\s+(.*)/m);
+                if (titleMatch && titleMatch[1]) {
+                    baseTitle = titleMatch[1].trim();
+                }
+            }
+
+            // Sanitize title: remove invalid filename chars and limit length
+            const safeTitle = baseTitle
+                .replace(/[\\/:*?"<>|]/g, '_')  // Remove Windows-invalid chars
+                .replace(/[^a-z0-9\s\-_]/gi, '_') // Remove other special chars
+                .replace(/\s+/g, '-')              // Spaces to dashes
+                .toLowerCase()
+                .slice(0, 50);                     // Max 50 chars
+
+            const filename = `${safeTitle}_${timestamp}${this.extension}`;
+
+            const duration = performance.now() - start;
+
+            return {
+                blob,
+                filename,
+                mimeType: this.mimeType,
+                size: blob.size,
+                duration
+            };
+
         } catch (error) {
             console.error('Plaintext export failed:', error);
             throw new Error(`Failed to export plaintext: ${error instanceof Error ? error.message : 'Unknown error'}`);

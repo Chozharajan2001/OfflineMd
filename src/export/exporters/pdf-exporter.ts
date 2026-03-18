@@ -1,4 +1,5 @@
-import type { IExporter, ExportInput, ExportResult, ExportFormat, ThemeTokens, ExportOptions } from '../types';
+import type { IExporter, ExportInput, ExportResult, ExportFormat } from '../types';
+import type { Color, PDFFont, PDFPage } from 'pdf-lib';
 
 interface TextRun {
     text: string;
@@ -11,6 +12,7 @@ interface TextRun {
 interface ParsedLine {
     type: 'heading1' | 'heading2' | 'heading3' | 'heading4' | 'paragraph' | 'code' | 'blockquote' | 'list' | 'orderedList' | 'tableRow' | 'hr' | 'empty' | 'image';
     content?: string;
+    language?: string;
     runs?: TextRun[];
     items?: string[];
     cells?: string[];
@@ -18,23 +20,30 @@ interface ParsedLine {
     altText?: string;  // Alt text for image
 }
 
+type PdfColor = { r: number; g: number; b: number };
+type PdfRgbFactory = (r: number, g: number, b: number) => Color;
+
 class MarkdownParser {
     parse(markdown: string): ParsedLine[] {
         const lines = markdown.split('\n');
         const result: ParsedLine[] = [];
         let inCodeBlock = false;
         let codeContent: string[] = [];
+        let codeLanguage = '';
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            const trimmed = line.trimStart();
 
-            if (line.startsWith('```') || line.startsWith('~~~')) {
+            if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
                 if (!inCodeBlock) {
                     inCodeBlock = true;
                     codeContent = [];
+                    codeLanguage = trimmed.slice(3).trim();
                 } else {
-                    result.push({ type: 'code', content: codeContent.join('\n') });
+                    result.push({ type: 'code', content: codeContent.join('\n'), language: codeLanguage });
                     inCodeBlock = false;
+                    codeLanguage = '';
                 }
                 continue;
             }
@@ -44,35 +53,35 @@ class MarkdownParser {
                 continue;
             }
 
-            if (line.startsWith('# ')) {
-                result.push({ type: 'heading1', content: line.slice(2) });
-            } else if (line.startsWith('## ')) {
-                result.push({ type: 'heading2', content: line.slice(3) });
-            } else if (line.startsWith('### ')) {
-                result.push({ type: 'heading3', content: line.slice(4) });
-            } else if (line.startsWith('#### ')) {
-                result.push({ type: 'heading4', content: line.slice(5) });
-            } else if (line.startsWith('> ')) {
-                result.push({ type: 'blockquote', runs: this.parseInlineFormatting(line.slice(2)) });
-            } else if (line.startsWith('- ') || line.startsWith('* ') || line.startsWith('+ ')) {
-                result.push({ type: 'list', content: line.slice(2) });
-            } else if (/^\d+\.\s/.test(line)) {
-                result.push({ type: 'orderedList', content: line.replace(/^\d+\.\s/, '') });
-            } else if (line.startsWith('|') && line.endsWith('|')) {
+            if (trimmed.startsWith('# ')) {
+                result.push({ type: 'heading1', content: trimmed.slice(2) });
+            } else if (trimmed.startsWith('## ')) {
+                result.push({ type: 'heading2', content: trimmed.slice(3) });
+            } else if (trimmed.startsWith('### ')) {
+                result.push({ type: 'heading3', content: trimmed.slice(4) });
+            } else if (trimmed.startsWith('#### ')) {
+                result.push({ type: 'heading4', content: trimmed.slice(5) });
+            } else if (trimmed.startsWith('> ')) {
+                result.push({ type: 'blockquote', runs: this.parseInlineFormatting(trimmed.slice(2)) });
+            } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('+ ')) {
+                result.push({ type: 'list', content: trimmed.slice(2) });
+            } else if (/^\d+\.\s/.test(trimmed)) {
+                result.push({ type: 'orderedList', content: trimmed.replace(/^\d+\.\s/, '') });
+            } else if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
                 const cells = line.split('|').filter((c, idx) => idx !== 0 && idx !== line.split('|').length - 1).map(c => c.trim());
                 if (cells.length > 0 && !line.match(/^[\s|:|-]+$/)) {
                     result.push({ type: 'tableRow', cells });
                 }
-            } else if (line.trim() === '---' || line.trim() === '***' || line.trim() === '___') {
+            } else if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
                 result.push({ type: 'hr' });
-            } else if (line.trim() === '') {
+            } else if (trimmed === '') {
                 result.push({ type: 'empty' });
-            } else if (line.match(/^!\[([^\]]*)\]\(([^)]+)\)/)) {
+            } else if (trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)/)) {
                 // Parse image syntax: ![alt text](url)
-                const match = line.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
+                const match = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)/);
                 if (match) {
-                    result.push({ 
-                        type: 'image', 
+                    result.push({
+                        type: 'image',
                         imageUrl: match[2],
                         altText: match[1]
                     });
@@ -193,10 +202,13 @@ export class PdfExporter implements IExporter {
      * Embeds PNG and JPG images from markdown. Handles CORS and unsupported formats gracefully.
      */
     supportsImages: boolean = true;
+    private readonly fontCharCache = new Map<string, string>();
+    private static readonly MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB per image
+    private static readonly MAX_TOTAL_IMAGE_BYTES = 30 * 1024 * 1024; // 30MB per export
 
     async export(input: ExportInput): Promise<ExportResult> {
         const start = performance.now();
-        
+
         try {
             const { markdown, theme, options, onProgress } = input;
 
@@ -208,362 +220,454 @@ export class PdfExporter implements IExporter {
             const { PDFDocument, StandardFonts, rgb, PageSizes } = await import('pdf-lib');
             const pdfDoc = await PDFDocument.create();
 
-        const pageSizeName = options.pageSize || 'A4';
-        let pageSize = PageSizes.A4;
-        if (pageSizeName === 'A3') pageSize = PageSizes.A3;
-        else if (pageSizeName === 'Letter') pageSize = PageSizes.Letter;
+            const pageSizeName = options.pageSize || 'A4';
+            let pageSize = PageSizes.A4;
+            if (pageSizeName === 'A3') pageSize = PageSizes.A3;
+            else if (pageSizeName === 'Letter') pageSize = PageSizes.Letter;
 
-        const isLandscape = options.orientation === 'landscape';
-        const [pageWidthOrig, pageHeightOrig] = pageSize;
-        const pageWidth = isLandscape ? pageHeightOrig : pageWidthOrig;
-        const pageHeight = isLandscape ? pageWidthOrig : pageHeightOrig;
+            const isLandscape = options.orientation === 'landscape';
+            const [pageWidthOrig, pageHeightOrig] = pageSize;
+            const pageWidth = isLandscape ? pageHeightOrig : pageWidthOrig;
+            const pageHeight = isLandscape ? pageWidthOrig : pageHeightOrig;
 
-        const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-        const helveticaOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
-        const helveticaBoldOblique = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
-        const courier = await pdfDoc.embedFont(StandardFonts.Courier);
+            const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+            const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+            const helveticaOblique = await pdfDoc.embedFont(StandardFonts.HelveticaOblique);
+            const helveticaBoldOblique = await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique);
+            const courier = await pdfDoc.embedFont(StandardFonts.Courier);
 
-        const marginMM = options.margins?.left || 20;
-        const margin = marginMM * 2.83465;
-        const contentWidth = pageWidth - margin * 2;
+            const marginTop = (options.margins?.top ?? 20) * 2.83465;
+            const marginRight = (options.margins?.right ?? 20) * 2.83465;
+            const marginBottom = (options.margins?.bottom ?? 20) * 2.83465;
+            const marginLeft = (options.margins?.left ?? 20) * 2.83465;
+            const contentWidth = pageWidth - marginLeft - marginRight;
 
-        let page = pdfDoc.addPage();
-        page.setSize(pageWidth, pageHeight);
-        let y = pageHeight - margin;
+            const effectiveTheme = options.includeTheme
+                ? theme
+                : {
+                    ui: { accent: '#2563eb' },
+                    preview: { foreground: '#111111', background: '#ffffff' },
+                    editor: { background: '#f5f5f5' },
+                };
+            const accent = this.hexToRgb(effectiveTheme.ui.accent);
+            const textCol = this.hexToRgb(effectiveTheme.preview.foreground);
+            const codeBg = this.hexToRgb(effectiveTheme.editor.background);
+            const pageBg = this.hexToRgb(effectiveTheme.preview.background);
 
-        const accent = this.hexToRgb(theme.ui.accent);
-        const textCol = this.hexToRgb(theme.preview.foreground);
-        const codeBg = this.hexToRgb(theme.editor.background);
+            const paintPageBackground = (targetPage: PDFPage) => {
+                targetPage.drawRectangle({
+                    x: 0,
+                    y: 0,
+                    width: pageWidth,
+                    height: pageHeight,
+                    color: rgb(pageBg.r, pageBg.g, pageBg.b),
+                });
+            };
 
-        const fontSize = options.fontSize || 12;
-        const lineHeight = fontSize * 1.6;
+            const createPage = () => {
+                const nextPage = pdfDoc.addPage();
+                nextPage.setSize(pageWidth, pageHeight);
+                paintPageBackground(nextPage);
+                return nextPage;
+            };
 
-        const parser = new MarkdownParser();
-        const parsed = parser.parse(markdown);
-        const totalLines = parsed.length;
-        let processedLines = 0;
+            let page = createPage();
+            let y = pageHeight - marginTop;
 
-        for (const line of parsed) {
-            // Report progress
-            processedLines++;
-            const progress = (processedLines / totalLines) * 100;
-            if (onProgress && processedLines % 10 === 0) { // Update every 10 lines
-                onProgress(progress);
-            }
-            
-            if (y < margin + 50) {
-                page = pdfDoc.addPage();
-                page.setSize(pageWidth, pageHeight);
-                y = pageHeight - margin;
-            }
+            const fontSize = options.fontSize || 12;
+            const lineHeight = fontSize * 1.6;
 
-            switch (line.type) {
-                case 'heading1':
-                    y -= fontSize * 0.5;
-                    const h1Lines = this.wrapText(line.content || '', helveticaBold, 28, contentWidth);
-                    for (const txt of h1Lines) {
-                        if (y < margin) { page = pdfDoc.addPage(); page.setSize(pageWidth, pageHeight); y = pageHeight - margin; }
-                        page.drawText(txt, { x: margin, y, size: 28, font: helveticaBold, color: rgb(accent.r, accent.g, accent.b) });
-                        y -= lineHeight * 1.5;
-                    }
-                    y -= lineHeight * 0.5;
-                    break;
+            const parser = new MarkdownParser();
+            const parsed = parser.parse(markdown);
+            const totalLines = Math.max(parsed.length, 1);
+            let processedLines = 0;
+            let totalEmbeddedImageBytes = 0;
 
-                case 'heading2':
-                    y -= fontSize * 0.3;
-                    const h2Lines = this.wrapText(line.content || '', helveticaBold, 22, contentWidth);
-                    for (const txt of h2Lines) {
-                        if (y < margin) { page = pdfDoc.addPage(); page.setSize(pageWidth, pageHeight); y = pageHeight - margin; }
-                        page.drawText(txt, { x: margin, y, size: 22, font: helveticaBold, color: rgb(textCol.r, textCol.g, textCol.b) });
-                        y -= lineHeight * 1.3;
-                    }
-                    y -= lineHeight * 0.3;
-                    break;
+            for (const line of parsed) {
+                // Report progress
+                processedLines++;
+                const progress = (processedLines / totalLines) * 100;
+                if (onProgress && processedLines % 10 === 0) { // Update every 10 lines
+                    onProgress(progress);
+                }
 
-                case 'heading3':
-                    y -= fontSize * 0.3;
-                    const h3Lines = this.wrapText(line.content || '', helveticaBold, 18, contentWidth);
-                    for (const txt of h3Lines) {
-                        if (y < margin) { page = pdfDoc.addPage(); page.setSize(pageWidth, pageHeight); y = pageHeight - margin; }
-                        page.drawText(txt, { x: margin, y, size: 18, font: helveticaBold, color: rgb(textCol.r, textCol.g, textCol.b) });
-                        y -= lineHeight * 1.2;
-                    }
-                    y -= lineHeight * 0.2;
-                    break;
+                if (y < marginBottom + 50) {
+                    page = createPage();
+                    y = pageHeight - marginTop;
+                }
 
-                case 'heading4':
-                    y -= fontSize * 0.2;
-                    const h4Lines = this.wrapText(line.content || '', helveticaBold, 15, contentWidth);
-                    for (const txt of h4Lines) {
-                        if (y < margin) { page = pdfDoc.addPage(); page.setSize(pageWidth, pageHeight); y = pageHeight - margin; }
-                        page.drawText(txt, { x: margin, y, size: 15, font: helveticaBold, color: rgb(textCol.r, textCol.g, textCol.b) });
-                        y -= lineHeight;
-                    }
-                    y -= lineHeight * 0.2;
-                    break;
+                switch (line.type) {
+                    case 'heading1':
+                        y -= fontSize * 0.5;
+                        const h1Lines = this.wrapText(line.content || '', helveticaBold, 28, contentWidth);
+                        for (const txt of h1Lines) {
+                            if (y < marginBottom) { page = createPage(); y = pageHeight - marginTop; }
+                            page.drawText(txt, { x: marginLeft, y, size: 28, font: helveticaBold, color: rgb(accent.r, accent.g, accent.b) });
+                            y -= lineHeight * 1.5;
+                        }
+                        y -= lineHeight * 0.5;
+                        break;
 
-                case 'paragraph':
-                    y -= fontSize * 0.3;
-                    if (line.runs && line.runs.length > 0) {
-                        y = this.drawFormattedText(page, line.runs, margin, y, fontSize, lineHeight, margin, pageWidth, pageHeight, pdfDoc, helvetica, helveticaBold, helveticaOblique, helveticaBoldOblique, courier, accent, textCol, codeBg, contentWidth, rgb);
-                    }
-                    y -= fontSize * 0.5;
-                    break;
+                    case 'heading2':
+                        y -= fontSize * 0.3;
+                        const h2Lines = this.wrapText(line.content || '', helveticaBold, 22, contentWidth);
+                        for (const txt of h2Lines) {
+                            if (y < marginBottom) { page = createPage(); y = pageHeight - marginTop; }
+                            page.drawText(txt, { x: marginLeft, y, size: 22, font: helveticaBold, color: rgb(textCol.r, textCol.g, textCol.b) });
+                            y -= lineHeight * 1.3;
+                        }
+                        y -= lineHeight * 0.3;
+                        break;
 
-                case 'code':
-                    y -= fontSize * 0.3;
-                    const codeLines = (line.content || '').split('\n');
-                    const codeBlockHeight = codeLines.length * lineHeight + 10;
-                    const maxCodeWidth = Math.max(...codeLines.map(l => courier.widthOfTextAtSize(l, fontSize * 0.9)));
+                    case 'heading3':
+                        y -= fontSize * 0.3;
+                        const h3Lines = this.wrapText(line.content || '', helveticaBold, 18, contentWidth);
+                        for (const txt of h3Lines) {
+                            if (y < marginBottom) { page = createPage(); y = pageHeight - marginTop; }
+                            page.drawText(txt, { x: marginLeft, y, size: 18, font: helveticaBold, color: rgb(textCol.r, textCol.g, textCol.b) });
+                            y -= lineHeight * 1.2;
+                        }
+                        y -= lineHeight * 0.2;
+                        break;
 
-                    if (y - codeBlockHeight < margin) {
-                        page = pdfDoc.addPage();
-                        page.setSize(pageWidth, pageHeight);
-                        y = pageHeight - margin;
-                    }
+                    case 'heading4':
+                        y -= fontSize * 0.2;
+                        const h4Lines = this.wrapText(line.content || '', helveticaBold, 15, contentWidth);
+                        for (const txt of h4Lines) {
+                            if (y < marginBottom) { page = createPage(); y = pageHeight - marginTop; }
+                            page.drawText(txt, { x: marginLeft, y, size: 15, font: helveticaBold, color: rgb(textCol.r, textCol.g, textCol.b) });
+                            y -= lineHeight;
+                        }
+                        y -= lineHeight * 0.2;
+                        break;
 
-                    const codeBlockWidth = Math.min(maxCodeWidth + 20, contentWidth);
-                    page.drawRectangle({
-                        x: margin,
-                        y: y - codeBlockHeight,
-                        width: codeBlockWidth,
-                        height: codeBlockHeight,
-                        color: rgb(codeBg.r, codeBg.g, codeBg.b),
-                        borderColor: rgb(textCol.r * 0.5, textCol.g * 0.5, textCol.b * 0.5),
-                        borderWidth: 0.5
-                    });
+                    case 'paragraph':
+                        y -= fontSize * 0.3;
+                        if (line.runs && line.runs.length > 0) {
+                            const formatted = this.drawFormattedText(page, line.runs, marginLeft, y, fontSize, lineHeight, marginBottom, marginTop, pageHeight, createPage, helvetica, helveticaBold, helveticaOblique, helveticaBoldOblique, courier, accent, textCol, codeBg, contentWidth, rgb);
+                            page = formatted.page;
+                            y = formatted.y;
+                        }
+                        y -= fontSize * 0.5;
+                        break;
 
-                    let codeY = y - fontSize;
-                    for (const codeLine of codeLines) {
-                        page.drawText(codeLine, {
-                            x: margin + 8,
-                            y: codeY,
-                            size: fontSize * 0.9,
-                            font: courier,
-                            color: rgb(textCol.r, textCol.g, textCol.b)
-                        });
-                        codeY -= lineHeight;
-                    }
-                    y = codeY - fontSize;
-                    break;
+                    case 'code':
+                        y -= fontSize * 0.3;
+                        const codeLines = (line.content || '').split('\n');
+                        const codeHeaderHeight = line.language ? lineHeight * 0.9 : 0;
+                        const codeBlockHeight = codeLines.length * lineHeight + 10 + codeHeaderHeight;
+                        const safeCodeLines = codeLines.map((l) => this.toWinAnsiSafeText(l, courier, fontSize * 0.9));
+                        const maxCodeWidth = Math.max(...safeCodeLines.map(l => courier.widthOfTextAtSize(l, fontSize * 0.9)));
 
-                case 'blockquote':
-                    y -= fontSize * 0.3;
-                    if (line.runs && line.runs.length > 0) {
-                        // Draw quote border
+                        if (y - codeBlockHeight < marginBottom) {
+                            page = createPage();
+                            y = pageHeight - marginTop;
+                        }
+
+                        const codeBlockWidth = Math.min(maxCodeWidth + 20, contentWidth);
                         page.drawRectangle({
-                            x: margin,
-                            y: y - lineHeight,
-                            width: 3,
-                            height: lineHeight,
-                            color: rgb(accent.r, accent.g, accent.b)
+                            x: marginLeft,
+                            y: y - codeBlockHeight,
+                            width: codeBlockWidth,
+                            height: codeBlockHeight,
+                            color: rgb(codeBg.r, codeBg.g, codeBg.b),
+                            borderColor: rgb(textCol.r * 0.5, textCol.g * 0.5, textCol.b * 0.5),
+                            borderWidth: 0.5
                         });
-                        y = this.drawFormattedText(page, line.runs, margin + 12, y, fontSize, lineHeight, margin, pageWidth, pageHeight, pdfDoc, helvetica, helveticaBold, helveticaOblique, helveticaBoldOblique, courier, accent, textCol, codeBg, contentWidth - 12, rgb);
-                    }
-                    y -= fontSize * 0.5;
-                    break;
 
-                case 'list':
-                    if (line.items) {
-                        for (const item of line.items) {
-                            y -= fontSize * 0.2;
-                            if (y < margin) { page = pdfDoc.addPage(); page.setSize(pageWidth, pageHeight); y = pageHeight - margin; }
-                            page.drawText('•', { x: margin, y, size: fontSize, font: helveticaBold, color: rgb(accent.r, accent.g, accent.b) });
-                            
-                            const itemRuns = parser.parseInlineFormatting(item);
-                            y = this.drawFormattedText(page, itemRuns, margin + 15, y, fontSize, lineHeight, margin, pageWidth, pageHeight, pdfDoc, helvetica, helveticaBold, helveticaOblique, helveticaBoldOblique, courier, accent, textCol, codeBg, contentWidth - 15, rgb);
-                        }
-                    }
-                    y -= fontSize * 0.3;
-                    break;
-
-                case 'orderedList':
-                    if (line.items) {
-                        let num = 1;
-                        for (const item of line.items) {
-                            y -= fontSize * 0.2;
-                            if (y < margin) { page = pdfDoc.addPage(); page.setSize(pageWidth, pageHeight); y = pageHeight - margin; }
-                            page.drawText(num + '.', { x: margin, y, size: fontSize, font: helveticaBold, color: rgb(accent.r, accent.g, accent.b) });
-                            
-                            const itemRuns = parser.parseInlineFormatting(item);
-                            y = this.drawFormattedText(page, itemRuns, margin + 20, y, fontSize, lineHeight, margin, pageWidth, pageHeight, pdfDoc, helvetica, helveticaBold, helveticaOblique, helveticaBoldOblique, courier, accent, textCol, codeBg, contentWidth - 20, rgb);
-                            num++;
-                        }
-                    }
-                    y -= fontSize * 0.3;
-                    break;
-
-                case 'tableRow':
-                    if (line.cells && line.cells.length > 0) {
-                        const colWidth = contentWidth / line.cells.length;
-                        const rowHeight = lineHeight;
-
-                        for (let j = 0; j < line.cells.length; j++) {
-                            const cellText = line.cells[j];
-                            const x = margin + j * colWidth;
-
-                            page.drawRectangle({
-                                x,
-                                y: y - rowHeight,
-                                width: colWidth,
-                                height: rowHeight,
-                                borderColor: rgb(textCol.r * 0.5, textCol.g * 0.5, textCol.b * 0.5),
-                                borderWidth: 0.5
+                        if (line.language) {
+                            const languageText = this.toWinAnsiSafeText(line.language.toUpperCase(), helveticaBold, fontSize * 0.75);
+                            page.drawText(languageText, {
+                                x: marginLeft + 8,
+                                y: y - (fontSize * 0.8),
+                                size: fontSize * 0.75,
+                                font: helveticaBold,
+                                color: rgb(textCol.r * 0.8, textCol.g * 0.8, textCol.b * 0.8),
                             });
+                        }
 
-                            const cellLines = this.wrapText(cellText, helvetica, fontSize, colWidth - 10);
-                            if (cellLines.length > 0) {
-                                page.drawText(cellLines[0], {
-                                    x: x + 5,
-                                    y: y - fontSize,
-                                    size: fontSize,
-                                    font: helvetica,
-                                    color: rgb(textCol.r, textCol.g, textCol.b)
-                                });
+                        let codeY = y - fontSize - codeHeaderHeight;
+                        for (const codeLine of safeCodeLines) {
+                            page.drawText(codeLine, {
+                                x: marginLeft + 8,
+                                y: codeY,
+                                size: fontSize * 0.9,
+                                font: courier,
+                                color: rgb(textCol.r, textCol.g, textCol.b)
+                            });
+                            codeY -= lineHeight;
+                        }
+                        y = codeY - fontSize;
+                        break;
+
+                    case 'blockquote':
+                        y -= fontSize * 0.3;
+                        if (line.runs && line.runs.length > 0) {
+                            // Draw quote border
+                            page.drawRectangle({
+                                x: marginLeft,
+                                y: y - lineHeight,
+                                width: 3,
+                                height: lineHeight,
+                                color: rgb(accent.r, accent.g, accent.b)
+                            });
+                            const formatted = this.drawFormattedText(page, line.runs, marginLeft + 12, y, fontSize, lineHeight, marginBottom, marginTop, pageHeight, createPage, helvetica, helveticaBold, helveticaOblique, helveticaBoldOblique, courier, accent, textCol, codeBg, contentWidth - 12, rgb);
+                            page = formatted.page;
+                            y = formatted.y;
+                        }
+                        y -= fontSize * 0.5;
+                        break;
+
+                    case 'list':
+                        if (line.items) {
+                            for (const item of line.items) {
+                                y -= fontSize * 0.2;
+                                if (y < marginBottom) { page = createPage(); y = pageHeight - marginTop; }
+                                page.drawText('•', { x: marginLeft, y, size: fontSize, font: helveticaBold, color: rgb(accent.r, accent.g, accent.b) });
+
+                                const itemRuns = parser.parseInlineFormatting(item);
+                                const formatted = this.drawFormattedText(page, itemRuns, marginLeft + 15, y, fontSize, lineHeight, marginBottom, marginTop, pageHeight, createPage, helvetica, helveticaBold, helveticaOblique, helveticaBoldOblique, courier, accent, textCol, codeBg, contentWidth - 15, rgb);
+                                page = formatted.page;
+                                y = formatted.y;
                             }
                         }
-                        y -= rowHeight;
-                    }
-                    break;
+                        y -= fontSize * 0.3;
+                        break;
 
-                case 'hr':
-                    y -= fontSize * 0.5;
-                    page.drawLine({
-                        start: { x: margin, y },
-                        end: { x: pageWidth - margin, y },
-                        thickness: 1,
-                        color: rgb(textCol.r * 0.5, textCol.g * 0.5, textCol.b * 0.5)
-                    });
-                    y -= fontSize;
-                    break;
+                    case 'orderedList':
+                        if (line.items) {
+                            let num = 1;
+                            for (const item of line.items) {
+                                y -= fontSize * 0.2;
+                                if (y < marginBottom) { page = createPage(); y = pageHeight - marginTop; }
+                                page.drawText(num + '.', { x: marginLeft, y, size: fontSize, font: helveticaBold, color: rgb(accent.r, accent.g, accent.b) });
 
-                case 'image':
-                    // Embed image in PDF
-                    if (line.imageUrl) {
-                        try {
-                            // Fetch image data
-                            const response = await fetch(line.imageUrl);
-                            const arrayBuffer = await response.arrayBuffer();
-                            
-                            // Determine image type and embed
-                            let embeddedImage;
-                            const contentType = response.headers.get('content-type');
-                            
-                            if (contentType?.includes('png')) {
-                                embeddedImage = await pdfDoc.embedPng(arrayBuffer);
-                            } else if (contentType?.includes('jpeg') || contentType?.includes('jpg')) {
-                                embeddedImage = await pdfDoc.embedJpg(arrayBuffer);
-                            } else {
-                                // Try PNG as fallback
-                                try {
-                                    embeddedImage = await pdfDoc.embedPng(arrayBuffer);
-                                } catch {
-                                    console.warn('Unsupported image format:', line.imageUrl);
-                                    // Draw alt text instead
-                                    page.drawText(`[Image: ${line.altText || 'No description'}]`, {
-                                        x: margin,
-                                        y: y - fontSize,
+                                const itemRuns = parser.parseInlineFormatting(item);
+                                const formatted = this.drawFormattedText(page, itemRuns, marginLeft + 20, y, fontSize, lineHeight, marginBottom, marginTop, pageHeight, createPage, helvetica, helveticaBold, helveticaOblique, helveticaBoldOblique, courier, accent, textCol, codeBg, contentWidth - 20, rgb);
+                                page = formatted.page;
+                                y = formatted.y;
+                                num++;
+                            }
+                        }
+                        y -= fontSize * 0.3;
+                        break;
+
+                    case 'tableRow':
+                        if (line.cells && line.cells.length > 0) {
+                            const colWidth = contentWidth / line.cells.length;
+                            const wrappedCells = line.cells.map((cell) =>
+                                this.wrapText(cell, helvetica, fontSize, colWidth - 10)
+                            );
+                            const maxCellLines = Math.max(...wrappedCells.map((lines) => Math.max(lines.length, 1)));
+                            const rowHeight = Math.max(lineHeight, maxCellLines * lineHeight + 8);
+
+                            if (y - rowHeight < marginBottom) {
+                                page = createPage();
+                                y = pageHeight - marginTop;
+                            }
+
+                            for (let j = 0; j < line.cells.length; j++) {
+                                const x = marginLeft + j * colWidth;
+
+                                page.drawRectangle({
+                                    x,
+                                    y: y - rowHeight,
+                                    width: colWidth,
+                                    height: rowHeight,
+                                    borderColor: rgb(textCol.r * 0.5, textCol.g * 0.5, textCol.b * 0.5),
+                                    borderWidth: 0.5
+                                });
+
+                                const cellLines = wrappedCells[j];
+                                for (let lineIndex = 0; lineIndex < cellLines.length; lineIndex++) {
+                                    const cellLine = cellLines[lineIndex];
+                                    const textY = y - fontSize - (lineIndex * lineHeight);
+                                    if (textY < y - rowHeight + 2) break;
+                                    page.drawText(cellLine, {
+                                        x: x + 5,
+                                        y: textY,
                                         size: fontSize,
-                                        font: helveticaOblique,
-                                        color: rgb(textCol.r * 0.6, textCol.g * 0.6, textCol.b * 0.6)
+                                        font: helvetica,
+                                        color: rgb(textCol.r, textCol.g, textCol.b)
                                     });
-                                    y -= fontSize * 2;
-                                    break;
                                 }
                             }
-                            
-                            // Calculate dimensions to fit page width
-                            const imageScale = Math.min(1, contentWidth / embeddedImage.width);
-                            const imgWidth = embeddedImage.width * imageScale;
-                            const imgHeight = embeddedImage.height * imageScale;
-                            
-                            // Check if we need a new page
-                            if (y - imgHeight < margin) {
-                                page = pdfDoc.addPage();
-                                page.setSize(pageWidth, pageHeight);
-                                y = pageHeight - margin;
-                            }
-                            
-                            // Draw image centered
-                            page.drawImage(embeddedImage, {
-                                x: margin + (contentWidth - imgWidth) / 2,
-                                y: y - imgHeight,
-                                width: imgWidth,
-                                height: imgHeight,
-                            });
-                            
-                            // Add alt text below image if exists
+                            y -= rowHeight;
+                        }
+                        break;
+
+                    case 'hr':
+                        y -= fontSize * 0.5;
+                        page.drawLine({
+                            start: { x: marginLeft, y },
+                            end: { x: pageWidth - marginRight, y },
+                            thickness: 1,
+                            color: rgb(textCol.r * 0.5, textCol.g * 0.5, textCol.b * 0.5)
+                        });
+                        y -= fontSize;
+                        break;
+
+                    case 'image':
+                        if (!options.embedImages) {
                             if (line.altText) {
-                                page.drawText(line.altText, {
-                                    x: margin,
-                                    y: y - imgHeight - fontSize - 5,
+                                page.drawText(`[Image omitted: ${line.altText}]`, {
+                                    x: marginLeft,
+                                    y: y - fontSize,
                                     size: fontSize * 0.9,
                                     font: helveticaOblique,
                                     color: rgb(textCol.r * 0.7, textCol.g * 0.7, textCol.b * 0.7)
                                 });
-                                y -= imgHeight + fontSize * 2.5;
-                            } else {
-                                y -= imgHeight + fontSize;
+                                y -= fontSize * 2;
                             }
-                        } catch (error) {
-                            console.warn('Failed to load image:', line.imageUrl, error);
-                            // Draw placeholder for failed images
-                            page.drawRectangle({
-                                x: margin,
-                                y: y - 50,
-                                width: contentWidth,
-                                height: 50,
-                                borderColor: rgb(textCol.r * 0.3, textCol.g * 0.3, textCol.b * 0.3),
-                                borderWidth: 1,
-                            });
-                            page.drawText(`[Image failed to load: ${line.altText || line.imageUrl}]`, {
-                                x: margin + 10,
-                                y: y - 30,
-                                size: fontSize * 0.85,
-                                font: helveticaOblique,
-                                color: rgb(textCol.r * 0.5, textCol.g * 0.5, textCol.b * 0.5)
-                            });
-                            y -= 60;
+                            break;
                         }
-                    }
-                    break;
+                        // Embed image in PDF
+                        if (line.imageUrl) {
+                            try {
+                                // Fetch image data
+                                const response = await fetch(line.imageUrl);
+                                if (!response.ok) {
+                                    throw new Error(`Image request failed with ${response.status}`);
+                                }
+                                const contentLength = Number(response.headers.get('content-length') || 0);
+                                if (contentLength > PdfExporter.MAX_IMAGE_BYTES) {
+                                    throw new Error(`Image too large (${Math.round(contentLength / 1024 / 1024)}MB)`);
+                                }
 
-                case 'empty':
-                    y -= fontSize * 0.5;
-                    break;
+                                const imageBlob = await response.blob();
+                                if (imageBlob.size > PdfExporter.MAX_IMAGE_BYTES) {
+                                    throw new Error(`Image too large (${Math.round(imageBlob.size / 1024 / 1024)}MB)`);
+                                }
+
+                                if (totalEmbeddedImageBytes + imageBlob.size > PdfExporter.MAX_TOTAL_IMAGE_BYTES) {
+                                    throw new Error('Total embedded image size limit exceeded');
+                                }
+                                totalEmbeddedImageBytes += imageBlob.size;
+
+                                const arrayBuffer = await imageBlob.arrayBuffer();
+
+                                // Determine image type and embed
+                                let embeddedImage;
+                                const contentType = response.headers.get('content-type');
+
+                                if (contentType?.includes('png')) {
+                                    embeddedImage = await pdfDoc.embedPng(arrayBuffer);
+                                } else if (contentType?.includes('jpeg') || contentType?.includes('jpg')) {
+                                    embeddedImage = await pdfDoc.embedJpg(arrayBuffer);
+                                } else {
+                                    // Try PNG as fallback
+                                    try {
+                                        embeddedImage = await pdfDoc.embedPng(arrayBuffer);
+                                    } catch {
+                                        console.warn('Unsupported image format:', line.imageUrl);
+                                        // Draw alt text instead
+                                        const safeImageLabel = this.toWinAnsiSafeText(`[Image: ${line.altText || 'No description'}]`, helveticaOblique, fontSize);
+                                        page.drawText(safeImageLabel, {
+                                            x: marginLeft,
+                                            y: y - fontSize,
+                                            size: fontSize,
+                                            font: helveticaOblique,
+                                            color: rgb(textCol.r * 0.6, textCol.g * 0.6, textCol.b * 0.6)
+                                        });
+                                        y -= fontSize * 2;
+                                        break;
+                                    }
+                                }
+
+                                // Calculate dimensions to fit page width
+                                const imageScale = Math.min(1, contentWidth / embeddedImage.width);
+                                const imgWidth = embeddedImage.width * imageScale;
+                                const imgHeight = embeddedImage.height * imageScale;
+
+                                // Check if we need a new page
+                                if (y - imgHeight < marginBottom) {
+                                    page = createPage();
+                                    y = pageHeight - marginTop;
+                                }
+
+                                // Draw image centered
+                                page.drawImage(embeddedImage, {
+                                    x: marginLeft + (contentWidth - imgWidth) / 2,
+                                    y: y - imgHeight,
+                                    width: imgWidth,
+                                    height: imgHeight,
+                                });
+
+                                // Add alt text below image if exists
+                                if (line.altText) {
+                                    const safeAltText = this.toWinAnsiSafeText(line.altText, helveticaOblique, fontSize * 0.9);
+                                    page.drawText(safeAltText, {
+                                        x: marginLeft,
+                                        y: y - imgHeight - fontSize - 5,
+                                        size: fontSize * 0.9,
+                                        font: helveticaOblique,
+                                        color: rgb(textCol.r * 0.7, textCol.g * 0.7, textCol.b * 0.7)
+                                    });
+                                    y -= imgHeight + fontSize * 2.5;
+                                } else {
+                                    y -= imgHeight + fontSize;
+                                }
+                            } catch (error) {
+                                console.warn('Failed to load image:', line.imageUrl, error);
+                                // Draw placeholder for failed images
+                                page.drawRectangle({
+                                    x: marginLeft,
+                                    y: y - 50,
+                                    width: contentWidth,
+                                    height: 50,
+                                    borderColor: rgb(textCol.r * 0.3, textCol.g * 0.3, textCol.b * 0.3),
+                                    borderWidth: 1,
+                                });
+                                const safeFailureLabel = this.toWinAnsiSafeText(`[Image failed to load: ${line.altText || line.imageUrl}]`, helveticaOblique, fontSize * 0.85);
+                                page.drawText(safeFailureLabel, {
+                                    x: marginLeft + 10,
+                                    y: y - 30,
+                                    size: fontSize * 0.85,
+                                    font: helveticaOblique,
+                                    color: rgb(textCol.r * 0.5, textCol.g * 0.5, textCol.b * 0.5)
+                                });
+                                y -= 60;
+                            }
+                        }
+                        break;
+
+                    case 'empty':
+                        y -= fontSize * 0.5;
+                        break;
+                }
             }
-        }
 
-        const pdfBytes = await pdfDoc.save();
-        const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: this.mimeType });
-        
-        // Generate filename with timestamp and extracted/sanitized title
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-        
-        // Extract title from first H1 heading if not in metadata
-        let baseTitle = input.metadata?.title || 'document';
-        if (!input.metadata?.title) {
-            const titleMatch = input.markdown.match(/^#\s+(.*)/m);
-            if (titleMatch && titleMatch[1]) {
-                baseTitle = titleMatch[1].trim();
+            if (onProgress) onProgress(100);
+
+            const pdfBytes = await pdfDoc.save();
+            const blob = new Blob([pdfBytes.buffer as ArrayBuffer], { type: this.mimeType });
+
+            // Generate filename with timestamp and extracted/sanitized title
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+
+            // Extract title from first H1 heading if not in metadata
+            let baseTitle = input.metadata?.title || 'document';
+            if (!input.metadata?.title) {
+                const titleMatch = input.markdown.match(/^#\s+(.*)/m);
+                if (titleMatch && titleMatch[1]) {
+                    baseTitle = titleMatch[1].trim();
+                }
             }
-        }
-        
-        // Sanitize title: remove invalid filename chars and limit length
-        const safeTitle = baseTitle
-            .replace(/[\\/:*?"<>|]/g, '_')  // Remove Windows-invalid chars
-            .replace(/[^a-z0-9\s\-_]/gi, '_') // Remove other special chars
-            .replace(/\s+/g, '-')              // Spaces to dashes
-            .toLowerCase()
-            .slice(0, 50);                     // Max 50 chars
-        
-        const filename = `${safeTitle}_${timestamp}${this.extension}`;
-        
-        const duration = performance.now() - start;
 
-        return { blob, filename, mimeType: this.mimeType, size: blob.size, duration };
-        
+            // Sanitize title: remove invalid filename chars and limit length
+            const safeTitle = baseTitle
+                .replace(/[\\/:*?"<>|]/g, '_')  // Remove Windows-invalid chars
+                .replace(/[^a-z0-9\s\-_]/gi, '_') // Remove other special chars
+                .replace(/\s+/g, '-')              // Spaces to dashes
+                .toLowerCase()
+                .slice(0, 50);                     // Max 50 chars
+
+            const filename = `${safeTitle}_${timestamp}${this.extension}`;
+
+            const duration = performance.now() - start;
+
+            return { blob, filename, mimeType: this.mimeType, size: blob.size, duration };
+
         } catch (error) {
             console.error('PDF export failed:', error);
             throw new Error(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -571,11 +675,11 @@ export class PdfExporter implements IExporter {
     }
 
     private drawFormattedText(
-        page: any, runs: TextRun[], x: number, y: number, fontSize: number, lineHeight: number,
-        margin: number, pageWidth: number, pageHeight: number, pdfDoc: any,
-        helvetica: any, helveticaBold: any, helveticaOblique: any, helveticaBoldOblique: any, courier: any,
-        accent: any, textCol: any, codeBg: any, maxWidth: number, rgb: any
-    ): number {
+        page: PDFPage, runs: TextRun[], x: number, y: number, fontSize: number, lineHeight: number,
+        bottomMargin: number, topMargin: number, pageHeight: number, createPage: () => PDFPage,
+        helvetica: PDFFont, helveticaBold: PDFFont, helveticaOblique: PDFFont, helveticaBoldOblique: PDFFont, courier: PDFFont,
+        accent: PdfColor, textCol: PdfColor, codeBg: PdfColor, maxWidth: number, rgb: PdfRgbFactory
+    ): { page: PDFPage; y: number } {
         let currentX = x;
         let currentY = y;
 
@@ -587,19 +691,20 @@ export class PdfExporter implements IExporter {
             else if (run.code) font = courier;
 
             const color = run.code ? rgb(accent.r, accent.g, accent.b) : rgb(textCol.r, textCol.g, textCol.b);
+            const safeRunText = this.toWinAnsiSafeText(run.text, font, fontSize);
 
             // Handle line wrapping for this run
-            const words = run.text.split(/(\s+)/);
+            const words = safeRunText.split(/(\s+)/);
             for (const word of words) {
+                if (!word) continue;
                 const wordWidth = font.widthOfTextAtSize(word, fontSize);
-                
+
                 if (currentX + wordWidth > x + maxWidth && currentX > x) {
                     currentX = x;
                     currentY -= lineHeight;
-                    if (currentY < margin) {
-                        page = pdfDoc.addPage();
-                        page.setSize(pageWidth, pageHeight);
-                        currentY = pageHeight - margin;
+                    if (currentY < bottomMargin) {
+                        page = createPage();
+                        currentY = pageHeight - topMargin;
                     }
                 }
 
@@ -625,19 +730,50 @@ export class PdfExporter implements IExporter {
             }
         }
 
-        return currentY - lineHeight;
+        return { page, y: currentY - lineHeight };
     }
 
-    private wrapText(text: string, font: any, fontSize: number, maxWidth: number): string[] {
+    /**
+     * Standard PDF fonts in pdf-lib use WinAnsi encoding and can throw for unsupported characters.
+     * Normalize line breaks and replace unsupported glyphs with safe fallbacks.
+     */
+    private toWinAnsiSafeText(text: string, font: PDFFont, fontSize: number): string {
+        const normalized = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        let safe = '';
+
+        for (const ch of normalized) {
+            // Keep visual flow stable: force hard line breaks to become spaces for inline runs.
+            const source = ch === '\n' ? ' ' : ch;
+            const cached = this.fontCharCache.get(source);
+            if (cached !== undefined) {
+                safe += cached;
+                continue;
+            }
+
+            try {
+                font.widthOfTextAtSize(source, fontSize);
+                this.fontCharCache.set(source, source);
+                safe += source;
+            } catch {
+                this.fontCharCache.set(source, '?');
+                safe += '?';
+            }
+        }
+
+        return safe;
+    }
+
+    private wrapText(text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] {
         if (!text) return [''];
-        
-        const words = text.split(' ');
+
+        const safeText = this.toWinAnsiSafeText(text, font, fontSize);
+        const words = safeText.split(' ');
         const lines: string[] = [];
         let currentLine = '';
 
         for (const word of words) {
             if (!word) continue;
-            
+
             const testLine = currentLine ? currentLine + ' ' + word : word;
             const width = font.widthOfTextAtSize(testLine, fontSize);
 

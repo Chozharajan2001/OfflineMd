@@ -41,7 +41,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#09090b',
             foreground: '#e4e4e7',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -62,7 +62,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#ffffff',
             foreground: '#09090b',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -83,7 +83,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#282a36',
             foreground: '#f8f8f2',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -104,7 +104,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#ffffff',
             foreground: '#24292e',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -125,7 +125,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#0d1117',
             foreground: '#c9d1d9',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -146,7 +146,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#2e3440',
             foreground: '#eceff4',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -167,7 +167,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#282c34',
             foreground: '#abb2bf',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -188,7 +188,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#1a1b26',
             foreground: '#a9b1d6',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -209,7 +209,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#fdf6e3',
             foreground: '#657b83',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -230,7 +230,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#002b36',
             foreground: '#839496',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -251,7 +251,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#2d2a2e',
             foreground: '#fcfcfa',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -272,7 +272,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#282828',
             foreground: '#ebdbb2',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -293,7 +293,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#ffffff',
             foreground: '#37352f',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -314,7 +314,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#1e1e2e',
             foreground: '#cdd6f4',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -335,7 +335,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#f4ecd8',
             foreground: '#5b4636',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -356,7 +356,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#1b2a1b',
             foreground: '#b8d4b8',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
@@ -377,22 +377,44 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#0b1929',
             foreground: '#b3c5d7',
-            fontFamily: "Inter, sans-serif",
+            fontFamily: 'Inter, sans-serif',
             fontSize: 16,
         },
     },
 };
 
+type DocumentStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
+
 interface MarkdownStore {
     // Editor Content
     markdown: string;
     setMarkdown: (markdown: string) => void;
+    setMarkdownFromUser: (markdown: string) => void;
 
     // File System State
     activeProjectId: number | null;
     activeFileId: number | null;
     setActiveProject: (id: number | null) => void;
     setActiveFile: (id: number | null) => void;
+
+    // Save State
+    documentStatus: DocumentStatus;
+    lastSavedAt: string | null;
+    saveError: string | null;
+    revision: number;
+    markDirty: () => void;
+    setSaving: () => void;
+    setSaved: (timestamp?: string) => void;
+    setSaveError: (message: string) => void;
+    resetSaveState: () => void;
+
+    // UI State
+    sidebarVisible: boolean;
+    setSidebarVisible: (visible: boolean) => void;
+    toggleSidebarVisible: () => void;
+    scrollSyncEnabled: boolean;
+    setScrollSyncEnabled: (enabled: boolean) => void;
+    toggleScrollSyncEnabled: () => void;
 
     // Theme State
     theme: ThemeConfig;
@@ -404,14 +426,58 @@ interface MarkdownStore {
 export const useMarkdownStore = create<MarkdownStore>()(
     persist(
         (set) => ({
+            // Initial state
             markdown: '# Hello World\n\nSelect a project to start.',
+            documentStatus: 'idle',
+            lastSavedAt: null,
+            saveError: null,
+            revision: 0,
+
+            // Content setters
             setMarkdown: (markdown) => set({ markdown }),
 
+            setMarkdownFromUser: (markdown) => set(state => ({
+                markdown,
+                documentStatus: 'dirty',
+                revision: state.revision + 1
+            })),
+
+            // Active file/project
             activeProjectId: null,
             activeFileId: null,
             setActiveProject: (id) => set({ activeProjectId: id }),
             setActiveFile: (id) => set({ activeFileId: id }),
 
+            // Save state actions
+            markDirty: () => set({ documentStatus: 'dirty', saveError: null }),
+            setSaving: () => set({ documentStatus: 'saving', saveError: null }),
+            setSaved: (timestamp) =>
+                set({
+                    documentStatus: 'saved',
+                    lastSavedAt: timestamp || new Date().toISOString(),
+                    saveError: null,
+                }),
+            setSaveError: (message) =>
+                set({
+                    documentStatus: 'error',
+                    saveError: message,
+                }),
+            resetSaveState: () =>
+                set({
+                    documentStatus: 'idle',
+                    lastSavedAt: null,
+                    saveError: null,
+                }),
+
+            // UI state
+            sidebarVisible: true,
+            setSidebarVisible: (visible) => set({ sidebarVisible: visible }),
+            toggleSidebarVisible: () => set((state) => ({ sidebarVisible: !state.sidebarVisible })),
+            scrollSyncEnabled: true,
+            setScrollSyncEnabled: (enabled) => set({ scrollSyncEnabled: enabled }),
+            toggleScrollSyncEnabled: () => set((state) => ({ scrollSyncEnabled: !state.scrollSyncEnabled })),
+
+            // Theme
             theme: themes.dark,
             setTheme: (theme) => set({ theme }),
             resetTheme: () => set({ theme: themes.dark }),
@@ -419,11 +485,10 @@ export const useMarkdownStore = create<MarkdownStore>()(
                 if (themes[name]) {
                     set({ theme: themes[name] });
                 }
-            }
+            },
         }),
         {
             name: 'markdown-converter-storage',
-            // We might want to persist activeFileId/ProjectId, but careful if they are deleted.
         }
     )
 );

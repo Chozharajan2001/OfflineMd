@@ -43,7 +43,7 @@ export interface DocumentMetadata {
  */
 export interface ExportInput {
     markdown: string;           // Raw markdown source
-    ast?: any;                  // Parsed Markdown AST (optional, depending on exporter)
+    ast?: unknown;              // Parsed Markdown AST (optional, depending on exporter)
     theme: ThemeTokens;          // Active theme tokens
     options: ExportOptions;      // User‑specified export options
     metadata: DocumentMetadata; // Document metadata (title, author, date, etc.)

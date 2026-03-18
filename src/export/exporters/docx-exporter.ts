@@ -1,5 +1,5 @@
-import type { IExporter, ExportInput, ExportResult, ExportFormat, ThemeTokens } from '../types';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, BorderStyle, ShadingType, Table, TableRow, TableCell, WidthType } from 'docx';
+import type { IExporter, ExportInput, ExportResult, ExportFormat } from '../types';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, BorderStyle, Table, TableRow, TableCell, WidthType } from 'docx';
 
 interface MarkdownLine {
     type: string;
@@ -127,13 +127,13 @@ export class DocxExporter implements IExporter {
 
     supportsTheme = true;
     supportsEditing = false;
-    supportsImages: boolean = true;
+    supportsImages: boolean = false;
 
     async export(input: ExportInput): Promise<ExportResult> {
         const start = performance.now();
-        
+
         try {
-            const { markdown, theme } = input;
+            const { markdown, theme, options } = input;
 
             // Validate input
             if (!markdown || typeof markdown !== 'string') {
@@ -143,250 +143,259 @@ export class DocxExporter implements IExporter {
             const parser = new MarkdownParser();
             const parsed = parser.parse(markdown);
 
-        const children: any[] = [];
-        const accentColor = this.hexToRgb(theme.ui.accent);
-        const textColor = this.hexToRgb(theme.preview.foreground);
-        const codeBgColor = this.hexToRgb(theme.editor.background);
+            const children: Array<Paragraph | Table> = [];
+            const effectiveTheme = options.includeTheme
+                ? theme
+                : {
+                    ui: { accent: '#2563eb' },
+                    preview: { foreground: '#111111', background: '#ffffff' },
+                    editor: { background: '#f5f5f5' },
+                };
+            const accentColor = this.hexToRgb(effectiveTheme.ui.accent);
+            const textColor = this.hexToRgb(effectiveTheme.preview.foreground);
+            const codeBgColor = this.hexToRgb(effectiveTheme.editor.background);
+            const pageBgColor = this.hexToRgb(effectiveTheme.preview.background);
 
-        for (const line of parsed) {
-            switch (line.type) {
-                case 'h1':
-                    children.push(
-                        new Paragraph({
-                            text: line.content,
-                            heading: HeadingLevel.HEADING_1,
-                            spacing: { before: 400, after: 200 },
-                            style: 'heading1'
-                        })
-                    );
-                    break;
-                case 'h2':
-                    children.push(
-                        new Paragraph({
-                            text: line.content,
-                            heading: HeadingLevel.HEADING_2,
-                            spacing: { before: 300, after: 150 },
-                            style: 'heading2'
-                        })
-                    );
-                    break;
-                case 'h3':
-                    children.push(
-                        new Paragraph({
-                            text: line.content,
-                            heading: HeadingLevel.HEADING_3,
-                            spacing: { before: 200, after: 100 },
-                            style: 'heading3'
-                        })
-                    );
-                    break;
-                case 'h4':
-                case 'h5':
-                case 'h6':
-                    children.push(
-                        new Paragraph({
-                            text: line.content,
-                            heading: HeadingLevel.HEADING_4,
-                            spacing: { before: 150, after: 100 }
-                        })
-                    );
-                    break;
-                case 'p':
-                    const runs = this.parseInlineFormatting(line.content, textColor, accentColor, codeBgColor);
-                    if (runs.length > 0) {
+            for (const line of parsed) {
+                switch (line.type) {
+                    case 'h1':
                         children.push(
                             new Paragraph({
-                                children: runs,
-                                spacing: { before: 100, after: 100 }
+                                text: line.content,
+                                heading: HeadingLevel.HEADING_1,
+                                spacing: { before: 400, after: 200 },
+                                style: 'heading1'
                             })
                         );
-                    }
-                    break;
-                case 'code':
-                    children.push(
-                        new Paragraph({
-                            children: [
-                                new TextRun({
-                                    text: line.content,
-                                    font: 'Courier New',
-                                    size: 20,
-                                    shading: { fill: this.rgbToHex(codeBgColor) }
-                                })
-                            ],
-                            spacing: { before: 150, after: 150 },
-                            indent: { left: 720 }
-                        })
-                    );
-                    break;
-                case 'blockquote':
-                    children.push(
-                        new Paragraph({
-                            children: [
-                                new TextRun({
-                                    text: line.content,
-                                    italics: true,
-                                    color: this.rgbToHex({ r: textColor.r * 0.8, g: textColor.g * 0.8, b: textColor.b * 0.8 })
-                                })
-                            ],
-                            spacing: { before: 150, after: 150 },
-                            indent: { left: 720 },
-                    border: {
-                        left: { color: this.rgbToHex(accentColor), space: 0, style: BorderStyle.SINGLE, size: 6 },
-                        top: undefined,
-                        bottom: undefined,
-                        right: undefined
-                    }
-                        })
-                    );
-                    break;
-                case 'list':
-                    if (line.items) {
-                        for (const item of line.items) {
-                            children.push(
-                                new Paragraph({
-                                    text: item,
-                                    numbering: {
-                                        reference: 'bullet-list',
-                                        level: 0
-                                    },
-                                    spacing: { before: 50, after: 50 },
-                                    indent: { left: 720 }
-                                })
-                            );
-                        }
-                    }
-                    break;
-                case 'orderedList':
-                    if (line.items) {
-                        let num = 1;
-                        for (const item of line.items) {
-                            children.push(
-                                new Paragraph({
-                                    text: item,
-                                    numbering: {
-                                        reference: 'ordered-list',
-                                        level: 0
-                                    },
-                                    spacing: { before: 50, after: 50 },
-                                    indent: { left: 720 }
-                                })
-                            );
-                            num++;
-                        }
-                    }
-                    break;
-                case 'table':
-                    if (line.cells && line.cells.length > 0) {
-                        const tableRows = line.cells.map(row => 
-                            new TableRow({
-                                children: row.map(cell => 
-                                    new TableCell({
-                                        children: [
-                                            new Paragraph({
-                                                children: [
-                                                    new TextRun({
-                                                        text: cell,
-                                                        bold: false
-                                                    })
-                                                ]
-                                            })
-                                        ]
-                                    })
-                                )
-                            })
-                        );
+                        break;
+                    case 'h2':
                         children.push(
-                            new Table({
-                                rows: tableRows,
-                                width: { size: 100, type: WidthType.PERCENTAGE }
+                            new Paragraph({
+                                text: line.content,
+                                heading: HeadingLevel.HEADING_2,
+                                spacing: { before: 300, after: 150 },
+                                style: 'heading2'
                             })
                         );
-                    }
-                    break;
-                case 'hr':
-                    children.push(
-                        new Paragraph({
-                            text: '',
-                            border: {
-                                bottom: { color: 'auto', space: 0, style: BorderStyle.SINGLE, size: 6 }
-                            },
-                            spacing: { before: 200, after: 200 }
-                        })
-                    );
-                    break;
+                        break;
+                    case 'h3':
+                        children.push(
+                            new Paragraph({
+                                text: line.content,
+                                heading: HeadingLevel.HEADING_3,
+                                spacing: { before: 200, after: 100 },
+                                style: 'heading3'
+                            })
+                        );
+                        break;
+                    case 'h4':
+                    case 'h5':
+                    case 'h6':
+                        children.push(
+                            new Paragraph({
+                                text: line.content,
+                                heading: HeadingLevel.HEADING_4,
+                                spacing: { before: 150, after: 100 }
+                            })
+                        );
+                        break;
+                    case 'p':
+                        const runs = this.parseInlineFormatting(line.content, textColor, accentColor, codeBgColor);
+                        if (runs.length > 0) {
+                            children.push(
+                                new Paragraph({
+                                    children: runs,
+                                    spacing: { before: 100, after: 100 }
+                                })
+                            );
+                        }
+                        break;
+                    case 'code':
+                        children.push(
+                            new Paragraph({
+                                children: [
+                                    new TextRun({
+                                        text: line.content,
+                                        font: 'Courier New',
+                                        size: 20,
+                                        shading: { fill: this.rgbToHex(codeBgColor) }
+                                    })
+                                ],
+                                spacing: { before: 150, after: 150 },
+                                indent: { left: 720 }
+                            })
+                        );
+                        break;
+                    case 'blockquote':
+                        children.push(
+                            new Paragraph({
+                                children: [
+                                    new TextRun({
+                                        text: line.content,
+                                        italics: true,
+                                        color: this.rgbToHex({ r: textColor.r * 0.8, g: textColor.g * 0.8, b: textColor.b * 0.8 })
+                                    })
+                                ],
+                                spacing: { before: 150, after: 150 },
+                                indent: { left: 720 },
+                                border: {
+                                    left: { color: this.rgbToHex(accentColor), space: 0, style: BorderStyle.SINGLE, size: 6 },
+                                    top: undefined,
+                                    bottom: undefined,
+                                    right: undefined
+                                }
+                            })
+                        );
+                        break;
+                    case 'list':
+                        if (line.items) {
+                            for (const item of line.items) {
+                                children.push(
+                                    new Paragraph({
+                                        text: item,
+                                        numbering: {
+                                            reference: 'bullet-list',
+                                            level: 0
+                                        },
+                                        spacing: { before: 50, after: 50 },
+                                        indent: { left: 720 }
+                                    })
+                                );
+                            }
+                        }
+                        break;
+                    case 'orderedList':
+                        if (line.items) {
+                            for (const item of line.items) {
+                                children.push(
+                                    new Paragraph({
+                                        text: item,
+                                        numbering: {
+                                            reference: 'ordered-list',
+                                            level: 0
+                                        },
+                                        spacing: { before: 50, after: 50 },
+                                        indent: { left: 720 }
+                                    })
+                                );
+                            }
+                        }
+                        break;
+                    case 'table':
+                        if (line.cells && line.cells.length > 0) {
+                            const tableRows = line.cells.map(row =>
+                                new TableRow({
+                                    children: row.map(cell =>
+                                        new TableCell({
+                                            children: [
+                                                new Paragraph({
+                                                    children: [
+                                                        new TextRun({
+                                                            text: cell,
+                                                            bold: false
+                                                        })
+                                                    ]
+                                                })
+                                            ]
+                                        })
+                                    )
+                                })
+                            );
+                            children.push(
+                                new Table({
+                                    rows: tableRows,
+                                    width: { size: 100, type: WidthType.PERCENTAGE }
+                                })
+                            );
+                        }
+                        break;
+                    case 'hr':
+                        children.push(
+                            new Paragraph({
+                                text: '',
+                                border: {
+                                    bottom: { color: 'auto', space: 0, style: BorderStyle.SINGLE, size: 6 }
+                                },
+                                spacing: { before: 200, after: 200 }
+                            })
+                        );
+                        break;
+                }
             }
-        }
 
-        const doc = new Document({
-            numbering: {
-                config: [
+            const doc = new Document({
+                background: {
+                    color: this.rgbToHex(pageBgColor),
+                },
+                numbering: {
+                    config: [
+                        {
+                            reference: 'ordered-list',
+                            levels: [
+                                {
+                                    level: 0,
+                                    format: 'decimal',
+                                    text: '%1.',
+                                    alignment: 'left'
+                                }
+                            ]
+                        },
+                        {
+                            reference: 'bullet-list',
+                            levels: [
+                                {
+                                    level: 0,
+                                    format: 'bullet',
+                                    text: '•',
+                                    alignment: 'left'
+                                }
+                            ]
+                        }
+                    ]
+                },
+                sections: [
                     {
-                        reference: 'ordered-list',
-                        levels: [
-                            {
-                                level: 0,
-                                format: 'decimal',
-                                text: '%1.',
-                                alignment: 'left'
-                            }
-                        ]
-                    },
-                    {
-                        reference: 'bullet-list',
-                        levels: [
-                            {
-                                level: 0,
-                                format: 'bullet',
-                                text: '•',
-                                alignment: 'left'
-                            }
-                        ]
+                        properties: {},
+                        children: children
                     }
                 ]
-            },
-            sections: [
-                {
-                    properties: {},
-                    children: children
+            });
+
+            const buffer = await Packer.toBuffer(doc);
+            const blob = new Blob([buffer] as BlobPart[], { type: this.mimeType });
+
+            // Generate filename with timestamp and extracted/sanitized title
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+
+            // Extract title from first H1 heading if not in metadata
+            let baseTitle = input.metadata?.title || 'document';
+            if (!input.metadata?.title) {
+                const titleMatch = input.markdown.match(/^#\s+(.*)/m);
+                if (titleMatch && titleMatch[1]) {
+                    baseTitle = titleMatch[1].trim();
                 }
-            ]
-        });
-
-        const buffer = await Packer.toBuffer(doc);
-        const blob = new Blob([buffer] as BlobPart[], { type: this.mimeType });
-        
-        // Generate filename with timestamp and extracted/sanitized title
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-        
-        // Extract title from first H1 heading if not in metadata
-        let baseTitle = input.metadata?.title || 'document';
-        if (!input.metadata?.title) {
-            const titleMatch = input.markdown.match(/^#\s+(.*)/m);
-            if (titleMatch && titleMatch[1]) {
-                baseTitle = titleMatch[1].trim();
             }
-        }
-        
-        // Sanitize title: remove invalid filename chars and limit length
-        const safeTitle = baseTitle
-            .replace(/[\\/:*?"<>|]/g, '_')  // Remove Windows-invalid chars
-            .replace(/[^a-z0-9\s\-_]/gi, '_') // Remove other special chars
-            .replace(/\s+/g, '-')              // Spaces to dashes
-            .toLowerCase()
-            .slice(0, 50);                     // Max 50 chars
-        
-        const filename = `${safeTitle}_${timestamp}${this.extension}`;
-        
-        const duration = performance.now() - start;
 
-        return {
-            blob,
-            filename,
-            mimeType: this.mimeType,
-            size: blob.size,
-            duration
-        };
-        
+            // Sanitize title: remove invalid filename chars and limit length
+            const safeTitle = baseTitle
+                .replace(/[\\/:*?"<>|]/g, '_')  // Remove Windows-invalid chars
+                .replace(/[^a-z0-9\s\-_]/gi, '_') // Remove other special chars
+                .replace(/\s+/g, '-')              // Spaces to dashes
+                .toLowerCase()
+                .slice(0, 50);                     // Max 50 chars
+
+            const filename = `${safeTitle}_${timestamp}${this.extension}`;
+
+            const duration = performance.now() - start;
+
+            return {
+                blob,
+                filename,
+                mimeType: this.mimeType,
+                size: blob.size,
+                duration
+            };
+
         } catch (error) {
             console.error('DOCX export failed:', error);
             throw new Error(`Failed to export DOCX: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -435,7 +444,7 @@ export class DocxExporter implements IExporter {
 
             if (nextMatch) {
                 const textContent = nextMatch[1];
-                
+
                 if (matchType === 'bold') {
                     runs.push(
                         new TextRun({

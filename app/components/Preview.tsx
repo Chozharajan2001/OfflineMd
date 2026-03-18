@@ -34,15 +34,16 @@ export function Preview() {
     // Initialize mermaid when theme changes and after client detection
     useEffect(() => {
         if (!isClient) return;
-        
+        const mermaidWindow = window as Window & { mermaidInitialized?: boolean };
+
         // Initialize mermaid only once globally to prevent re-registration
-        if (!(window as any).mermaidInitialized) {
+        if (!mermaidWindow.mermaidInitialized) {
             mermaid.initialize({
                 startOnLoad: false,
                 theme: theme.preview.background === '#ffffff' ? 'default' : 'dark',
                 securityLevel: 'loose',
             });
-            (window as any).mermaidInitialized = true;
+            mermaidWindow.mermaidInitialized = true;
         } else {
             // Update theme on existing instance
             mermaid.initialize({
@@ -76,17 +77,17 @@ export function Preview() {
             setRenderedHtml(safeHtml);
         }, 150)
     );
-    
+
     // Track the latest markdown being parsed to prevent race conditions
     const latestMarkdownRef = useRef<string>('');
 
     useEffect(() => {
         if (!isClient) return;
         latestMarkdownRef.current = markdown;
-        
+
         // Cancel previous parse if new markdown arrives quickly
         debouncedParse.current(markdown);
-        
+
         // Cleanup function to cancel stale parses
         return () => {
             // Optional: Could add abort controller support here for true cancellation
@@ -96,22 +97,24 @@ export function Preview() {
     // Re-run mermaid diagrams after HTML updates
     useEffect(() => {
         if (!isClient) return;
-        
+
         // Sync scrolling - listen to editor scroll events
-        const handleEditorScroll = (e: CustomEvent<{ scrollPercentage: number }>) => {
+        const handleEditorScroll: EventListener = (event) => {
+            const e = event as CustomEvent<{ scrollPercentage: number }>;
+            if (!useMarkdownStore.getState().scrollSyncEnabled) return;
             if (previewRef.current) {
                 const scrollHeight = previewRef.current.scrollHeight - previewRef.current.clientHeight;
                 previewRef.current.scrollTop = e.detail.scrollPercentage * scrollHeight;
             }
         };
-        
-        window.addEventListener('editor-scroll' as any, handleEditorScroll as any);
-        return () => window.removeEventListener('editor-scroll' as any, handleEditorScroll as any);
+
+        window.addEventListener('editor-scroll', handleEditorScroll);
+        return () => window.removeEventListener('editor-scroll', handleEditorScroll);
     }, [isClient]);
-    
+
     useEffect(() => {
         if (!isClient) return;
-        
+
         // Convert fenced mermaid blocks into mermaid containers for rendering
         const convertMermaidBlocks = () => {
             const codeBlocks = document.querySelectorAll('pre > code.language-mermaid');
@@ -126,9 +129,9 @@ export function Preview() {
                 }
             });
         };
-        
+
         convertMermaidBlocks();
-        
+
         // Render mermaid diagrams
         const timer = setTimeout(() => {
             const mermaidNodes = document.querySelectorAll('.mermaid');
@@ -138,7 +141,7 @@ export function Preview() {
                     .catch((err) => console.debug('Mermaid rendering validation:', err));
             }
         }, 100);
-        
+
         // Cleanup: Remove old mermaid SVGs to prevent memory leaks
         return () => {
             clearTimeout(timer);
@@ -303,6 +306,7 @@ export function Preview() {
     if (!isClient) {
         return (
             <div
+                ref={previewRef}
                 className="h-full w-full overflow-auto p-8"
                 style={{
                     backgroundColor: theme.preview.background,
@@ -320,6 +324,7 @@ export function Preview() {
     // Note: Content is sanitized twice (MarkdownParser + DOMPurify) for XSS protection
     return (
         <div
+            ref={previewRef}
             className="h-full w-full overflow-auto p-8"
             style={{
                 backgroundColor: theme.preview.background,

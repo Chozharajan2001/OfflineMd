@@ -1,33 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import MonacoEditor from '@monaco-editor/react';
 import { useMarkdownStore } from '../store';
 
 export function Editor() {
-    const { markdown, setMarkdown, theme } = useMarkdownStore();
+    const { markdown, setMarkdownFromUser, theme, documentStatus, lastSavedAt, saveError } = useMarkdownStore();
     const [isClient, setIsClient] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [lastSaved, setLastSaved] = useState<Date | null>(null);
-    const editorRef = useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
         setIsClient(true);
     }, []);
-
-    // Debounced auto-save with visual feedback
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setIsSaving(true);
-            // Simulate save delay for visual feedback
-            setTimeout(() => {
-                setIsSaving(false);
-                setLastSaved(new Date());
-            }, 300);
-        }, 500); // 500ms debounce
-
-        return () => clearTimeout(timer);
-    }, [markdown]);
 
     // Show loading state during SSR/hydration
     if (!isClient) {
@@ -38,25 +21,48 @@ export function Editor() {
         );
     }
 
+    // Format lastSavedAt for display
+    const formatSavedTime = (iso: string | null) => {
+        if (!iso) return '';
+        const date = new Date(iso);
+        return date.toLocaleTimeString();
+    };
+
+    // Determine status message
+    let statusMessage: React.ReactNode = null;
+    if (documentStatus === 'saving') {
+        statusMessage = (
+            <span className="flex items-center gap-1">
+                <span className="animate-spin h-2 w-2 rounded-full bg-[var(--accent)]"></span>
+                Saving...
+            </span>
+        );
+    } else if (documentStatus === 'saved') {
+        statusMessage = <span>Saved {formatSavedTime(lastSavedAt)}</span>;
+    } else if (documentStatus === 'error') {
+        statusMessage = <span className="text-red-500">{saveError || 'Save failed'}</span>;
+    } else if (documentStatus === 'dirty') {
+        statusMessage = <span>Unsaved changes</span>;
+    }
+
     return (
         <div className="h-full w-full relative">
-            {/* Auto-save indicator */}
-            <div className="absolute top-2 right-4 z-10 text-xs text-[var(--sidebar-muted)] transition-opacity duration-300">
-                {isSaving ? (
-                    <span className="flex items-center gap-1">
-                        <span className="animate-spin h-2 w-2 rounded-full bg-[var(--accent)]"></span>
-                        Saving...
-                    </span>
-                ) : lastSaved ? (
-                    <span>Saved {lastSaved.toLocaleTimeString()}</span>
-                ) : null}
-            </div>
-            
+            {/* Save status indicator (visible + live region) */}
+            {statusMessage && (
+                <div
+                    className="absolute top-2 right-4 z-10 text-xs text-[var(--sidebar-muted)] transition-opacity duration-300"
+                    aria-live="polite"
+                    aria-atomic="true"
+                >
+                    {statusMessage}
+                </div>
+            )}
+
             <MonacoEditor
                 height="100%"
                 language="markdown"
                 value={markdown}
-                onChange={(value) => setMarkdown(value || '')}
+                onChange={(value) => setMarkdownFromUser(value || '')}
                 theme="vs-dark"
                 options={{
                     minimap: { enabled: false },
@@ -69,12 +75,13 @@ export function Editor() {
                     fontLigatures: true,
                 }}
                 onMount={(editor) => {
-                    // Add scroll sync event listener
-                    const container = editor.getContainerDomNode();
-                    container?.addEventListener('scroll', () => {
-                        const scrollPercentage = container.scrollTop / Math.max(1, container.scrollHeight - container.clientHeight);
-                        window.dispatchEvent(new CustomEvent('editor-scroll', { 
-                            detail: { scrollPercentage } 
+                    editor.onDidScrollChange(() => {
+                        if (!useMarkdownStore.getState().scrollSyncEnabled) return;
+                        const scrollTop = editor.getScrollTop();
+                        const maxScroll = Math.max(1, editor.getScrollHeight() - editor.getLayoutInfo().height);
+                        const scrollPercentage = scrollTop / maxScroll;
+                        window.dispatchEvent(new CustomEvent('editor-scroll', {
+                            detail: { scrollPercentage }
                         }));
                     });
                 }}

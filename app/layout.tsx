@@ -31,9 +31,7 @@ export const metadata: Metadata = {
 
 export const viewport = {
     width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false // Prevent zooming on mobile for app-like feel
+    initialScale: 1
 };
 
 export default function RootLayout({

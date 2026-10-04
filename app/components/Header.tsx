@@ -273,22 +273,22 @@ export function Header() {
     }, [activeProjectId, openExportDialog, toast, handleSave]);
 
     return (
-        <header className="bg-[var(--header-bg)] text-[var(--header-fg)] p-4 flex justify-between items-center border-b border-[var(--header-border)]">
-            <div className="flex items-center gap-3">
+        <header className="bg-[var(--header-bg)] text-[var(--header-fg)] p-3 sm:p-4 flex justify-between items-center gap-2 border-b border-[var(--header-border)]">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
                 <button
                     type="button"
-                    className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    className="p-2 shrink-0 hover:bg-[var(--header-hover)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                     onClick={handleSidebarToggle}
                     title="Toggle Sidebar"
                     aria-label="Toggle sidebar"
                 >
                     <Menu className="w-5 h-5" />
                 </button>
-                <h1 className="text-xl font-bold tracking-tight">Markdown Converter</h1>
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate">Markdown Converter</h1>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-1 sm:gap-2 items-center shrink-0">
                 <div
-                    className="flex gap-1 border-[var(--header-border)] pr-2 mr-2"
+                    className="flex gap-1 border-[var(--header-border)] pr-2 mr-1 sm:mr-2"
                     role="toolbar"
                     aria-label="File operations"
                 >

@@ -83,7 +83,7 @@ export function Toast({ toast, onClose }: ToastProps) {
     <div
       role="alert"
       aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
-      className={`flex items-start gap-3 p-4 rounded-lg border shadow-lg ${styles.bg} ${styles.border} animate-slide-in-right`}
+      className={`relative flex items-start gap-3 p-4 rounded-lg border shadow-lg ${styles.bg} ${styles.border} animate-slide-in-right`}
     >
       {/* Icon */}
       <div className="flex-shrink-0 mt-0.5">{styles.icon}</div>

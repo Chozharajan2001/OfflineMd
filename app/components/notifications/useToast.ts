@@ -1,42 +1,32 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
+import { create } from 'zustand';
 import type { ToastMessage, ToastType } from './types';
 import { generateToastId } from './types';
 
-/**
- * Hook for managing toast notifications.
- * 
- * Usage:
- * ```tsx
- * const { toasts, addToast, removeToast, success, error, warn, info } = useToast();
- * 
- * // Show success toast
- * success('File saved successfully!');
- * 
- * // Show error with custom duration
- * error('Failed to save file', { duration: 8000 });
- * ```
- */
-export function useToast() {
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+interface ToastStore {
+  toasts: ToastMessage[];
+  addToast: (message: string, type: ToastType, options?: { duration?: number }) => string;
+  removeToast: (id: string) => void;
+}
 
-  const addToast = useCallback((message: string, type: ToastType, options?: { duration?: number }) => {
+// Module-level store: the container is mounted once in the root layout, so toasts raised by
+// any component must live in shared state rather than a per-component useState.
+const useToastStore = create<ToastStore>((set) => ({
+  toasts: [],
+  addToast: (message, type, options) => {
     const id = generateToastId();
-    const toast: ToastMessage = {
-      id,
-      type,
-      message,
-      duration: options?.duration,
-    };
-
-    setToasts((prev) => [...prev, toast]);
+    set((prev) => ({ toasts: [...prev.toasts, { id, type, message, duration: options?.duration }] }));
     return id;
-  }, []);
+  },
+  removeToast: (id) => set((prev) => ({ toasts: prev.toasts.filter((t) => t.id !== id) })),
+}));
 
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+export function useToast() {
+  const toasts = useToastStore((state) => state.toasts);
+  const addToast = useToastStore((state) => state.addToast);
+  const removeToast = useToastStore((state) => state.removeToast);
 
   // Convenience methods
   const success = useCallback(

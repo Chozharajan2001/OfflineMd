@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import mermaid from 'mermaid';
 import DOMPurify from 'dompurify';
 import { useMarkdownStore } from '../store';
 import { markdownParser } from '../services/MarkdownParser';
@@ -30,29 +29,6 @@ export function Preview() {
         }, 0);
         return () => clearTimeout(timer);
     }, []);
-
-    // Initialize mermaid when theme changes and after client detection
-    useEffect(() => {
-        if (!isClient) return;
-        const mermaidWindow = window as Window & { mermaidInitialized?: boolean };
-
-        // Initialize mermaid only once globally to prevent re-registration
-        if (!mermaidWindow.mermaidInitialized) {
-            mermaid.initialize({
-                startOnLoad: false,
-                theme: theme.preview.background === '#ffffff' ? 'default' : 'dark',
-                securityLevel: 'loose',
-            });
-            mermaidWindow.mermaidInitialized = true;
-        } else {
-            // Update theme on existing instance
-            mermaid.initialize({
-                startOnLoad: false,
-                theme: theme.preview.background === '#ffffff' ? 'default' : 'dark',
-                securityLevel: 'loose',
-            });
-        }
-    }, [isClient, theme]);
 
     // Debounced markdown parsing with sanitization
     const debouncedParse = useRef(
@@ -112,13 +88,25 @@ export function Preview() {
         return () => window.removeEventListener('editor-scroll', handleEditorScroll);
     }, [isClient]);
 
-    useEffect(() => {
-        if (!isClient) return;
+    // Mermaid costs ~1 MB of JavaScript, so load it only when the rendered
+    // document actually contains a diagram.
+    const hasMermaidDiagram = /language-mermaid/.test(renderedHtml);
 
-        // Convert fenced mermaid blocks into mermaid containers for rendering
-        const convertMermaidBlocks = () => {
-            const codeBlocks = document.querySelectorAll('pre > code.language-mermaid');
-            codeBlocks.forEach((codeEl) => {
+    useEffect(() => {
+        if (!isClient || !hasMermaidDiagram) return;
+
+        let cancelled = false;
+
+        (async () => {
+            const { default: mermaid } = await import('mermaid');
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: theme.preview.background === '#ffffff' ? 'default' : 'dark',
+                securityLevel: 'loose',
+            });
+
+            // Convert fenced mermaid blocks into mermaid containers for rendering
+            document.querySelectorAll('pre > code.language-mermaid').forEach((codeEl) => {
                 const text = codeEl.textContent || '';
                 const wrapper = document.createElement('div');
                 wrapper.className = 'mermaid';
@@ -128,28 +116,15 @@ export function Preview() {
                     pre.parentElement.replaceChild(wrapper, pre);
                 }
             });
-        };
 
-        convertMermaidBlocks();
-
-        // Render mermaid diagrams
-        const timer = setTimeout(() => {
-            const mermaidNodes = document.querySelectorAll('.mermaid');
-            if (mermaidNodes.length > 0) {
-                mermaid
-                    .run({ nodes: Array.from(mermaidNodes) as HTMLElement[] })
-                    .catch((err) => console.debug('Mermaid rendering validation:', err));
+            const mermaidNodes = Array.from(document.querySelectorAll('.mermaid')) as HTMLElement[];
+            if (!cancelled && mermaidNodes.length > 0) {
+                await mermaid.run({ nodes: mermaidNodes }).catch((err) => console.debug('Mermaid rendering validation:', err));
             }
-        }, 100);
+        })().catch((err) => console.debug('Mermaid load failed:', err));
 
-        // Cleanup: Remove old mermaid SVGs to prevent memory leaks
-        return () => {
-            clearTimeout(timer);
-            // Clean up rendered mermaid SVGs but keep the source code blocks
-            const renderedMermaids = document.querySelectorAll('.mermaid[data-processed="true"] svg, .mermaid[data-processed="true"] img');
-            renderedMermaids.forEach(el => el.remove());
-        };
-    }, [renderedHtml, isClient]);
+        return () => { cancelled = true; };
+    }, [isClient, hasMermaidDiagram, renderedHtml, theme]);
 
     // Inline styles for rich typography
     const proseStyles = `

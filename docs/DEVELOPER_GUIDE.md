@@ -26,7 +26,7 @@ The Markdown Editor & Converter is a privacy-first, offline-capable markdown edi
 ### Core Principles
 
 - **Privacy First**: All data stored locally, never transmitted
-- **Offline Capability**: Full PWA support with service workers
+- **Offline Capability**: ⚠️ Not currently working — `next-pwa` is installed but `withPWA` is not applied in `next.config.ts` and no service worker is registered
 - **Zero Cost**: Free forever, no premium tiers
 - **Open Source**: Community-driven development
 - **Professional Tools**: IDE-quality editing experience
@@ -460,9 +460,9 @@ await triggerDownload(result.blob, result.filename);
 | Markdown | `markdown-exporter.ts` | Complete | Native | Raw text export |
 | HTML | `html-exporter.ts` | Complete | Unified.js | Self-contained with CSS |
 | Plain Text | `plaintext-exporter.ts` | Complete | Native | Stripped formatting |
-| PDF | `pdf-exporter.ts` | Complete | pdf-lib | Multi-page, WinAnsi |
-| DOCX | `docx-exporter.ts` | Complete | docx.js | Basic formatting |
-| PPTX | `pptx-exporter.ts` | Placeholder | - | Not implemented |
+| PDF | `pdf-exporter.ts` | Complete | pdf-lib | Multi-page, WinAnsi, embedded PNG/JPG |
+| DOCX | `docx-exporter.ts` | Complete | docx | Headings, lists, blockquotes, tables, inline formatting |
+| PPTX | `pptx-exporter.ts` | Complete | pptxgenjs | One slide per section, title + body |
 
 ### Export Options Interface
 

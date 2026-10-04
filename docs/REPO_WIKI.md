@@ -30,7 +30,7 @@ Complete documentation and knowledge base for the Markdown Editor & Converter pr
 ### Core Identity
 
 - **Privacy First**: 100% client-side storage using IndexedDB - your documents never leave your device
-- **Offline Capable**: Full PWA support with service workers for offline usage
+- **Offline Capable**: ⚠️ Claimed but not delivered — no service worker is registered (see Privacy & Offline)
 - **Zero Cost**: Completely free, no subscriptions or premium tiers
 - **Open Source**: Community-driven development
 - **Professional Tools**: IDE-quality editing experience with Monaco Editor
@@ -621,10 +621,11 @@ User Action (Create/Delete/Load)
 
 ### 1. Privacy & Offline
 - ✅ 100% client-side storage using IndexedDB (via Dexie.js)
-- ✅ Zero server dependencies - all data stays on your device
-- ✅ Works completely offline as a Progressive Web App (PWA)
+- ✅ No backend data service — all data stays on your device
+- ⚠️ Offline/PWA support is **not currently working**: `next-pwa` is a dependency but
+  `next.config.ts` never applies `withPWA`, and no code registers a service worker
+- ❌ Service worker caching of static assets — not active (see above)
 - ✅ No account required, no data collection
-- ✅ Service worker caches static assets
 
 ### 2. Editor Features
 - ✅ **Monaco Editor** integration - the same editor powering VS Code
@@ -639,7 +640,7 @@ User Action (Create/Delete/Load)
 ### 3. Organization System
 - ✅ **Projects** - Create multiple projects for different contexts
 - ✅ **Hierarchical folders** - Organize files with nested folder support
-- ✅ **File management** - Create, rename, delete, and move files and folders
+- ✅ **File management** - Create, rename and delete files and folders (move/reparent is not implemented)
 - ✅ **Recent files** - Quick access to recently edited documents
 - ✅ Reactive database queries with dexie-react-hooks
 
@@ -659,9 +660,10 @@ User Action (Create/Delete/Load)
 | **Markdown (.md)** | ✅ Complete | Native | Raw markdown export |
 | **HTML (.html)** | ✅ Complete | Unified.js | Self-contained with theme CSS |
 | **Plain Text (.txt)** | ✅ Complete | Native | Stripped markdown formatting |
-| **PDF (.pdf)** | ✅ Complete | pdf-lib | Multi-page, WinAnsi encoding |
-| **Word (.docx)** | ✅ Complete (Basic) | docx.js | Basic formatting (raw text) |
-| **PowerPoint (.pptx)** | ⚠️ Placeholder | - | Not fully implemented |
+| **PDF (.pdf)** | ✅ Complete | pdf-lib | Multi-page, glyph-safe text, embedded PNG/JPG |
+| **Word (.docx)** | ✅ Complete | docx | Headings, lists, blockquotes, tables, inline formatting |
+| **PowerPoint (.pptx)** | ✅ Complete | pptxgenjs | One slide per markdown section |
+| **Project archive (.zip)** | ✅ Complete | jszip | Whole project tree from the sidebar |
 
 ---
 
@@ -1045,16 +1047,19 @@ export interface ExportOptions {
 - **Special**: Includes `sanitizeForWinAnsi()` method for character encoding
 
 #### 4. **DOCX Exporter** ([`docx-exporter.ts`](src/export/exporters/docx-exporter.ts))
-- **Status**: ✅ Complete (Basic)
-- **Limitations**: Currently exports raw markdown text only
+- **Status**: ✅ Complete
+- **Features**: Converts markdown into real Word structures — headings, bullet/ordered lists,
+  blockquotes, tables and inline bold/italic/code runs
+- **Limitation**: images are not embedded in DOCX output
 
 #### 5. **Plaintext Exporter** ([`plaintext-exporter.ts`](src/export/exporters/plaintext-exporter.ts))
 - **Status**: ✅ Complete
 - **Features**: Strips markdown formatting
 
 #### 6. **PPTX Exporter** ([`pptx-exporter.ts`](src/export/exporters/pptx-exporter.ts))
-- **Status**: ⚠️ Placeholder
-- **Note**: Returns placeholder text, full implementation needed
+- **Status**: ✅ Complete
+- **Note**: Uses `pptxgenjs` (dynamically imported) to build a title slide plus one content slide
+  per markdown section
 
 ### Export UI Components
 
@@ -1412,7 +1417,10 @@ markdown-converter/
 **A**: Yes! All data is stored in your browser's IndexedDB. Nothing is transmitted to servers.
 
 ### Q: Can I use this offline?
-**A**: Absolutely! The app is a PWA (Progressive Web App) that works completely offline after initial load.
+**A**: Not fully, as things stand. Your notes live in IndexedDB so they survive an offline reload
+of an already-cached page, but the service worker is never registered (`next-pwa` is installed
+without `withPWA` in `next.config.ts`), so the app shell is not cached and a cold start without
+network will fail. Wiring this up is the top item on the roadmap.
 
 ### Q: How do I export my documents?
 **A**: Click the Export button in the header, choose your format (Markdown, HTML, PDF, DOCX, TXT, or PPTX), configure options, and download.

@@ -24,7 +24,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 ## Project Overview
 
-The Markdown Editor & Converter is a privacy-first, offline-capable markdown editor built with Next.js. It provides a professional editing experience with Monaco Editor, live preview, and comprehensive export capabilities.
+The Markdown Editor & Converter is a privacy-first, local-first markdown editor built with Next.js. It provides a professional editing experience with Monaco Editor, live preview, and comprehensive export capabilities.
 
 ### Core Features
 
@@ -33,7 +33,7 @@ The Markdown Editor & Converter is a privacy-first, offline-capable markdown edi
 - **Project Management**: Hierarchical folders and files
 - **17 Themes**: Dark, light, and custom themes
 - **Export Formats**: Markdown, HTML, PDF, DOCX, TXT, PPTX
-- **Offline Capable**: PWA with IndexedDB storage
+- **Offline Capable**: IndexedDB storage (the PWA service worker is not wired up yet)
 - **Privacy First**: No data leaves your device
 
 ---
@@ -291,7 +291,7 @@ src/export/
 │   ├── pdf-exporter.ts       # Complete
 │   ├── docx-exporter.ts      # Complete
 │   ├── plaintext-exporter.ts # Complete
-│   └── pptx-exporter.ts      # Placeholder
+│   └── pptx-exporter.ts      # Complete (pptxgenjs)
 └── utils/
     ├── file-saver.ts
     ├── markdown-parser.ts

@@ -1,10 +1,15 @@
 # Markdown Editor & Converter
 
-A powerful, fully offline markdown editor with live preview, project management, and multi-format export capabilities. Built with Next.js and React.
+A powerful, privacy-first markdown editor with live preview, project management, and multi-format
+export capabilities. Built with Next.js and React.
+
+> **Offline note:** documents are stored locally in IndexedDB, but the PWA service worker is not
+> registered today, so "works completely offline" is a goal rather than a fact. See
+> [docs/FUTURE_FEATURES.md](./docs/FUTURE_FEATURES.md).
 
 ## Core Identity
 
-**A privacy-first, offline-capable markdown editor with professional export features.**
+**A privacy-first markdown editor with professional export features.**
 
 ---
 
@@ -12,8 +17,8 @@ A powerful, fully offline markdown editor with live preview, project management,
 
 ### Privacy & Offline
 - 100% client-side storage using IndexedDB (via Dexie.js)
-- Zero server dependencies - all data stays on your device
-- Works completely offline as a Progressive Web App (PWA)
+- No backend data service - all data stays on your device
+- ⚠️ Offline/PWA mode is not wired up yet (service worker never registered)
 - No account required, no data collection
 
 ### Editor Features
@@ -26,7 +31,7 @@ A powerful, fully offline markdown editor with live preview, project management,
 ### Organization System
 - **Projects** - Create multiple projects for different contexts
 - **Hierarchical folders** - Organize files with nested folder support
-- **File management** - Create, rename, delete, and move files and folders
+- **File management** - Create, rename and delete files and folders (move/reparent is not implemented yet)
 - **Recent files** - Quick access to recently edited documents
 
 ### Theming System
@@ -41,9 +46,10 @@ A powerful, fully offline markdown editor with live preview, project management,
 | **Markdown (.md)** | Ready | Raw markdown export |
 | **HTML (.html)** | Ready | Self-contained with theme CSS |
 | **Plain Text (.txt)** | Ready | Stripped markdown formatting |
-| **PDF (.pdf)** | Ready | Multi-page with WinAnsi encoding support |
-| **Word (.docx)** | Ready | Basic formatting (raw text) |
-| **PowerPoint (.pptx)** | Ready | Placeholder implementation |
+| **PDF (.pdf)** | Ready | pdf-lib: multi-page, WinAnsi encoding, embedded PNG/JPG images |
+| **Word (.docx)** | Ready | Headings, lists, blockquotes, tables and inline formatting (not raw text) |
+| **PowerPoint (.pptx)** | Ready | `pptxgenjs`, one slide per section with title and body text |
+| **Project archive (.zip)** | Ready | Whole project tree as folder structure, from the sidebar |
 
 ---
 
@@ -59,11 +65,14 @@ A powerful, fully offline markdown editor with live preview, project management,
 - **Diagrams**: Mermaid 11.12.2
 - **Export Libraries**: 
   - pdf-lib (PDF generation)
-  - docx.js (Word documents)
+  - docx (Word documents)
+  - pptxgenjs (PowerPoint decks)
+  - jszip (project ZIP export)
   - file-saver (Downloads)
 - **UI Components**: Radix UI primitives (Dialog, Dropdown Menu, Tabs, Tooltip)
 - **Icons**: Lucide React
-- **PWA**: next-pwa for offline capabilities
+- **PWA**: `next-pwa` is a dependency but is **not yet wired** — `next.config.ts` does not apply
+  `withPWA` and nothing registers the service worker, so full-offline mode is still a TODO
 
 ---
 
@@ -115,9 +124,10 @@ markdown-converter/
 │   ├── services/                # Business logic
 │   │   ├── Database.ts          # Dexie.js IndexedDB schema
 │   │   ├── MarkdownParser.ts    # Unified.js processor
-│   │   └── ExportService.ts     # Legacy export (deprecated)
-│   ├── store.ts                 # Zustand state management
-│   ├── layout.tsx               # Root layout with PWA config
+│   │   ├── ThemeAdapter.ts      # Unused — theming actually lives in ThemeProvider.tsx
+│   │   └── ExportService.ts     # Legacy html2pdf export (deprecated, imported by nothing)
+│   ├── store.ts                 # Zustand state management + 17 theme presets
+│   ├── layout.tsx               # Root layout; links the web-app manifest (no service worker)
 │   ├── page.tsx                 # Main page
 │   └── globals.css              # Global styles & Tailwind
 ├── src/export/                  # New export system
@@ -176,7 +186,7 @@ User Input → Editor Component → Zustand Store → Preview Component → Rend
 2. **Zero Cost** - Completely free, no subscriptions
 3. **Professional Editor** - Monaco Editor with IDE-like experience
 4. **Flexible Export** - Multiple formats for sharing
-5. **Works Offline** - PWA support for any environment
+5. **Local-First Data** - Notes live in IndexedDB (offline app-shell support still TODO)
 6. **Open Source** - Community-driven development
 
 ---

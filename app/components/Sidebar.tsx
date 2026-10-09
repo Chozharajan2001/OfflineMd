@@ -63,6 +63,7 @@ export function Sidebar() {
     const [openMoveNode, setOpenMoveNode] = useState(false);
     const [pendingMoveNode, setPendingMoveNode] = useState<FileNode | null>(null);
     const [moveTargetId, setMoveTargetId] = useState<string>('root');
+    const [trashOpen, setTrashOpen] = useState(false);
     const [contextMenu, setContextMenu] = useState<ContextMenuState>({
         open: false,
         x: 0,
@@ -777,18 +778,6 @@ export function Sidebar() {
                     </select>
                 </div>
 
-                {/* Recents */}
-                <div className="p-3 border-[var(--sidebar-border)]" role="group" aria-label="Recent files">
-                    <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider mb-2">Recents</h2>
-                    <RecentsList />
-                </div>
-
-                {/* Favorites */}
-                <div className="p-3 border-[var(--sidebar-border)]" role="group" aria-label="Favorite files">
-                    <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider mb-2">Favorites</h2>
-                    <FavoritesList />
-                </div>
-
                 {/* File Tree */}
                 <div className="flex-1 overflow-auto p-2" role="region" aria-label="File Explorer" tabIndex={0}>
                     {activeProjectId ? (
@@ -845,8 +834,8 @@ export function Sidebar() {
                                             setSearchQuery('');
                                         }
                                     }}
-                                    placeholder="Search files..."
-                                    aria-label="Search files and folders"
+                                    placeholder="Search names + content…"
+                                    aria-label="Search file names and content"
                                     className="w-full bg-[var(--sidebar-input-bg)] text-[var(--sidebar-fg)] text-sm rounded p-1 border border-[var(--sidebar-border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                                 />
                             </div>
@@ -884,23 +873,40 @@ export function Sidebar() {
                 {/* In-app table of contents for the open document */}
                 {activeFileId && <TableOfContents />}
 
-                {/* Trash */}
+                {/* Pinned & recent — one list language (4.1) */}
+                <div className="p-3 border-t border-[var(--sidebar-border)]" role="group" aria-label="Pinned and recent files">
+                    <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider mb-2">Pinned & recent</h2>
+                    <FavoritesList />
+                    <div className="my-2 border-t border-[var(--sidebar-border)]" aria-hidden="true" />
+                    <RecentsList />
+                </div>
+
+                {/* Trash — collapsed footer row with count badge (4.1) */}
                 {activeProjectId && (
-                    <div className="p-3 border-t border-[var(--sidebar-border)]" role="group" aria-label="Trash">
-                        <div className="flex justify-between items-center mb-2">
-                            <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider">
+                    <div className="p-2 border-t border-[var(--sidebar-border)]" role="group" aria-label="Trash">
+                        <button
+                            type="button"
+                            onClick={() => setTrashOpen((v) => !v)}
+                            aria-expanded={trashOpen}
+                            className="flex w-full items-center gap-2 rounded px-2 min-h-[36px] text-xs font-bold uppercase tracking-wider text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                        >
+                            <Trash2 size={14} aria-hidden="true" />
+                            <span className="flex-1 text-left">
                                 Trash{trashedNodes.length > 0 ? ` (${trashedNodes.length})` : ''}
-                            </h2>
-                            {trashedNodes.length > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={() => void emptyTrash()}
-                                    className="text-xs text-red-500 hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-red-500 rounded px-1"
-                                >
-                                    Empty trash
-                                </button>
-                            )}
-                        </div>
+                            </span>
+                            <ChevronRight size={14} aria-hidden="true" className={`transition-transform ${trashOpen ? 'rotate-90' : ''}`} />
+                        </button>
+                        {trashOpen && (
+                            <div className="mt-1 px-2 pb-1">
+                                {trashedNodes.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => void emptyTrash()}
+                                        className="mb-1 text-xs text-red-500 hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-red-500 rounded px-1 min-h-[36px]"
+                                    >
+                                        Empty trash
+                                    </button>
+                                )}
                         {trashedNodes.length === 0 ? (
                             <div className="text-[var(--sidebar-muted)] text-xs italic">Trash is empty</div>
                         ) : (
@@ -926,6 +932,8 @@ export function Sidebar() {
                                         </button>
                                     </div>
                                 ))}
+                            </div>
+                        )}
                             </div>
                         )}
                     </div>

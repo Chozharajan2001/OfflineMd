@@ -37,6 +37,19 @@ body {
     }
 }
 
+/* TOC arrival flash: confirms click-to-scroll landed (motion-safe) */
+@keyframes toc-flash {
+    from { background-color: var(--accent); opacity: 0.35; }
+    to { background-color: transparent; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .preview-content :target {
+        animation: toc-flash 1.2s ease-out;
+        border-radius: 4px;
+    }
+}
+
 @media print {
     body {
         background: white;

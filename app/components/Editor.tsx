@@ -71,37 +71,23 @@ export function Editor() {
         return date.toLocaleTimeString();
     };
 
-    // Determine status message
-    let statusMessage: React.ReactNode = null;
-    if (documentStatus === 'saving') {
-        statusMessage = (
-            <span className="flex items-center gap-1">
-                <span className="animate-spin h-2 w-2 rounded-full bg-[var(--accent)]"></span>
-                Saving...
-            </span>
-        );
-    } else if (documentStatus === 'saved') {
-        statusMessage = <span>Saved {formatSavedTime(lastSavedAt)}</span>;
-    } else if (documentStatus === 'error') {
-        statusMessage = <span className="text-red-500">{saveError || 'Save failed'}</span>;
-    } else if (documentStatus === 'dirty') {
-        statusMessage = <span>Unsaved changes</span>;
-    }
+    // Single status surface: state first, stats second (3.1 — floating badge removed)
+    const statusDot =
+        documentStatus === 'saving' ? 'bg-[var(--accent)] animate-pulse'
+        : documentStatus === 'saved' ? 'bg-[var(--color-success)]'
+        : documentStatus === 'error' ? 'bg-[var(--color-danger)]'
+        : documentStatus === 'dirty' ? 'bg-[var(--color-warning)]'
+        : 'bg-[var(--sidebar-muted)]';
+    const statusText =
+        documentStatus === 'saving' ? 'Saving…'
+        : documentStatus === 'saved' ? `Saved ${formatSavedTime(lastSavedAt)}`
+        : documentStatus === 'error' ? (saveError || 'Save failed')
+        : documentStatus === 'dirty' ? 'Unsaved changes'
+        : 'Ready';
 
     return (
         <div className="h-full w-full relative flex flex-col">
             <div className="flex-1 relative min-h-0">
-            {/* Save status indicator (visible + live region) */}
-            {statusMessage && (
-                <div
-                    className="absolute top-2 right-4 z-10 text-xs text-[var(--sidebar-muted)] transition-opacity duration-300"
-                    aria-live="polite"
-                    aria-atomic="true"
-                >
-                    {statusMessage}
-                </div>
-            )}
-
             <MonacoEditor
                 height="100%"
                 language="markdown"
@@ -132,10 +118,15 @@ export function Editor() {
             />
             </div>
             <div
-                className="shrink-0 px-3 py-1.5 text-xs text-[var(--sidebar-muted)] border-t border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] flex gap-3"
+                className="shrink-0 px-3 py-1.5 text-xs text-[var(--sidebar-muted)] border-t border-[var(--sidebar-border)] bg-[var(--sidebar-bg)] flex gap-3 items-center"
                 aria-live="polite"
-                aria-label="Document statistics"
+                aria-label="Document status and statistics"
             >
+                <span className="flex items-center gap-1.5 font-medium text-[var(--sidebar-fg)]">
+                    <span className={`h-2 w-2 rounded-full ${statusDot}`} aria-hidden="true" />
+                    {statusText}
+                </span>
+                <span aria-hidden="true" className="opacity-40">·</span>
                 <span>{stats.words.toLocaleString()} words</span>
                 <span>{stats.chars.toLocaleString()} chars</span>
                 <span>{stats.minutes} min read</span>

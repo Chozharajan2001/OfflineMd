@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
+import { ArrowUpDown, Copy } from 'lucide-react';
 import { useMarkdownStore } from '../store';
 import { markdownParser } from '../services/MarkdownParser';
 import { safeFontFamily, safeHex, accentTextFor } from '../../src/export/utils/theme-validation';
 import { getFrontMatter } from '../../src/export/utils/front-matter';
+import { useToast } from './notifications/useToast';
 
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
     if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
@@ -29,6 +31,9 @@ function debounce<A extends unknown[], R>(func: (...args: A) => R, delay: number
 
 export function Preview() {
     const { markdown, theme } = useMarkdownStore();
+    const scrollSyncEnabled = useMarkdownStore((s) => s.scrollSyncEnabled);
+    const toggleScrollSyncEnabled = useMarkdownStore((s) => s.toggleScrollSyncEnabled);
+    const toast = useToast();
     const [renderedHtml, setRenderedHtml] = useState('');
     const [isClient, setIsClient] = useState(false);
     const previewRef = useRef<HTMLDivElement>(null);
@@ -390,6 +395,33 @@ export function Preview() {
             }}
         >
             <style>{proseStyles}</style>
+            {/* Preview-local toolbar: scroll sync + copy live here, not the global header */}
+            <div className="sticky top-0 z-10 flex justify-end gap-1 pb-2 -mt-1" role="toolbar" aria-label="Preview tools">
+                <button
+                    type="button"
+                    onClick={toggleScrollSyncEnabled}
+                    aria-pressed={scrollSyncEnabled}
+                    title={scrollSyncEnabled ? 'Disable scroll sync' : 'Enable scroll sync'}
+                    aria-label={scrollSyncEnabled ? 'Disable scroll sync' : 'Enable scroll sync'}
+                    className={`min-h-[36px] min-w-[36px] inline-flex items-center justify-center p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${scrollSyncEnabled ? 'bg-[var(--sidebar-hover)]' : 'opacity-60 hover:opacity-100 hover:bg-[var(--sidebar-hover)]'}`}
+                >
+                    <ArrowUpDown className="w-4 h-4" aria-hidden="true" />
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        void navigator.clipboard.writeText(markdown).then(
+                            () => toast.success('Markdown copied!'),
+                            () => toast.error('Copy failed')
+                        );
+                    }}
+                    title="Copy markdown"
+                    aria-label="Copy markdown to clipboard"
+                    className="min-h-[36px] min-w-[36px] inline-flex items-center justify-center p-1.5 rounded opacity-60 hover:opacity-100 hover:bg-[var(--sidebar-hover)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                >
+                    <Copy className="w-4 h-4" aria-hidden="true" />
+                </button>
+            </div>
             {frontMatter.title && (
                 <div className="preview-content mb-2 text-sm opacity-70" aria-label="Document metadata">
                     {String(frontMatter.title)}

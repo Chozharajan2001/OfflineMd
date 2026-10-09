@@ -853,14 +853,30 @@ export function Sidebar() {
                             {hasFilterMatches ? (
                                 <NodeList parentId={null} />
                             ) : (
-                                <div className="text-[var(--sidebar-muted)] text-center text-sm mt-8">
-                                    No matching files or folders
+                                <div className="text-center text-sm mt-8 px-4">
+                                    <p className="text-[var(--sidebar-muted)] mb-3">No matching files or folders</p>
+                                    {isFiltering && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setSearchQuery('')}
+                                            className="px-3 min-h-[40px] rounded bg-[var(--button-secondary-bg)] hover:bg-[var(--button-secondary-hover)] text-[var(--button-fg)] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                                        >
+                                            Clear search
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </>
                     ) : (
-                        <div className="text-[var(--sidebar-muted)] text-center text-sm mt-10">
-                            Select a project to view files
+                        <div className="text-center text-sm mt-10 px-4">
+                            <p className="text-[var(--sidebar-muted)] mb-3">Select a project to view files</p>
+                            <button
+                                type="button"
+                                onClick={() => setOpenCreateProject(true)}
+                                className="px-3 min-h-[40px] rounded bg-[var(--button-primary-bg)] text-[var(--button-fg)] hover:bg-[var(--button-primary-hover)] text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                            >
+                                New project
+                            </button>
                         </div>
                     )}
                 </div>

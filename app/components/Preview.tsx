@@ -339,13 +339,49 @@ export function Preview() {
     // Note: Content is sanitized twice (MarkdownParser + DOMPurify) for XSS protection
     const frontMatter = getFrontMatter(markdown).data;
     const metaLine = [frontMatter.author, frontMatter.date].filter(Boolean).join(' · ');
+    const { activeProjectId } = useMarkdownStore.getState();
+    if (!activeProjectId) {
+        return (
+            <div
+                ref={previewRef}
+                role="region"
+                aria-label="Getting started"
+                tabIndex={0}
+                className="h-full w-full overflow-auto p-4 sm:p-8"
+                style={{
+                    backgroundColor: theme.preview.background,
+                    color: theme.preview.foreground,
+                    fontFamily: theme.preview.fontFamily,
+                    fontSize: `${theme.preview.fontSize}px`,
+                }}
+            >
+                <div className="preview-content max-w-xl mx-auto mt-10 rounded-xl border border-[var(--dialog-border)] bg-[var(--surface-1)] p-6 sm:p-8 text-center">
+                    <h1 className="!border-0 !pb-0">Start writing in seconds</h1>
+                    <p>Create a project, add a file, and your words autosave as you type.</p>
+                    <button
+                        type="button"
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-new-project-dialog'))}
+                        className="mt-2 px-4 min-h-[44px] rounded bg-[var(--button-primary-bg)] text-[var(--button-fg)] hover:bg-[var(--button-primary-hover)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    >
+                        Create your first project
+                    </button>
+                    <p className="text-sm opacity-70">…or pick a file from the sidebar to keep editing.</p>
+                </div>
+                <style>{proseStyles}</style>
+                <div
+                    className="preview-content"
+                    dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                />
+            </div>
+        );
+    }
     return (
         <div
             ref={previewRef}
             role="region"
             aria-label="Markdown preview"
             tabIndex={0}
-            className="h-full w-full overflow-auto p-8"
+            className="h-full w-full overflow-auto p-4 sm:p-8"
             style={{
                 backgroundColor: theme.preview.background,
                 color: theme.preview.foreground,

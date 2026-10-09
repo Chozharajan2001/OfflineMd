@@ -429,7 +429,7 @@ export const useMarkdownStore = create<MarkdownStore>()(
     persist(
         (set) => ({
             // Initial state
-            markdown: '# Hello World\n\nSelect a project to start.',
+            markdown: '# Welcome to Markdown Converter\n\nYour notes live **on this device** — nothing is uploaded. Create a project in the sidebar, then write.\n\n## Try it\n\n- **Bold**, *italic*, `code`, and [links](https://example.com)\n- Math: $E = mc^2$ and $$\\int_0^1 x\\,dx$$\n- export to PDF, DOCX, slides, PNG and more\n\n## Next steps\n\n1. Create a project from the sidebar\n2. Add a file and start typing\n3. Press Ctrl+S to save, Ctrl+E to export\n',
             documentStatus: 'idle',
             lastSavedAt: null,
             saveError: null,

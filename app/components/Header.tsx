@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Settings, Save, Upload, Menu, ArrowUpDown } from 'lucide-react';
+import { Settings, Save, Upload, Menu, ArrowUpDown, Columns2, SquarePen, Eye } from 'lucide-react';
 import { useMarkdownStore, themes } from '../store';
 import { ExportOrchestrator } from '../../src/export/export-service';
 import type { ExportFormat, ThemeTokens } from '../../src/export/types';
@@ -11,6 +11,7 @@ import { ExportOptionsDialog } from '../../src/export/components/ExportOptionsDi
 import { ExportProgressBar } from '../../src/export/components/ExportProgressBar';
 import { triggerDownload } from '../../src/export/utils/file-saver';
 import { db } from '../services/Database';
+import { buildWorkspaceBackup, restoreWorkspaceBackup } from '../utils/backup';
 import { ConfirmDialog, InputDialog } from './dialogs';
 import { useToast } from './notifications/useToast';
 
@@ -33,6 +34,8 @@ export function Header() {
         markDirty,
         scrollSyncEnabled,
         toggleScrollSyncEnabled,
+        viewMode,
+        setViewMode,
     } = useMarkdownStore();
     const toast = useToast();
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -44,6 +47,8 @@ export function Header() {
     // Dialog states
     const [openSaveAsDialog, setOpenSaveAsDialog] = useState(false);
     const [openImportConfirm, setOpenImportConfirm] = useState(false);
+    const [openBackupConfirm, setOpenBackupConfirm] = useState(false);
+    const [pendingBackupFile, setPendingBackupFile] = useState<File | null>(null);
     const [pendingImportContent, setPendingImportContent] = useState<string | null>(null);
     const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
     const [isMacPlatform, setIsMacPlatform] = useState(false);
@@ -140,10 +145,21 @@ export function Header() {
         }
     };
 
+    const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
+
     const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file && (file.type === 'text/plain' || file.name.endsWith('.md'))) {
+        // Reset so the same file can be picked twice in a row
+        event.target.value = '';
+        const validExt = /\.m(d|txt)$/i.test(file?.name || '');
+        const validType = file && (file.type === 'text/plain' || file.type === 'text/markdown' || file.type === '');
+        if (file && (validExt || validType)) {
+            if (file.size > MAX_IMPORT_BYTES) {
+                toast.error('File too large (max 2 MB).');
+                return;
+            }
             const reader = new FileReader();
+            reader.onerror = () => toast.error('Import failed while reading file.');
             reader.onload = async (e) => {
                 const content = e.target?.result as string;
                 setMarkdownFromUser(content);
@@ -173,7 +189,7 @@ export function Header() {
                 projectId: activeProjectId,
                 parentId: null,
                 type: 'file',
-                name: pendingImportFile.name.replace('.md', ''),
+                name: pendingImportFile.name.replace(/\.(md|txt)$/i, '') || 'imported',
                 content: pendingImportContent,
                 createdAt: new Date(),
                 updatedAt: new Date(),
@@ -303,18 +319,56 @@ export function Header() {
                         <Save className="w-5 h-5" />
                     </button>
                     <label
+                        htmlFor="import-file-input"
                         className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors cursor-pointer"
                         title="Import File"
                         aria-label="Import file"
                     >
                         <Upload className="w-5 h-5" />
-                        <input type="file" accept=".md,.txt" onChange={handleImport} className="hidden" />
                     </label>
+                    <input id="import-file-input" type="file" accept=".md,.txt" onChange={handleImport} className="sr-only" />
                 </div>
 
                 <ExportMenu
                     shortcutLabel={exportShortcutLabel}
                     onSelect={(format) => {
+                        // md/txt have no options — export directly instead of empty dialog (M-12)
+                        if (format === 'md' || format === 'txt') {
+                            void (async () => {
+                                setExporting(true);
+                                setExportProgress(0);
+                                try {
+                                    const { markdown, theme } = useMarkdownStore.getState();
+                                    const input = {
+                                        markdown,
+                                        ast: undefined,
+                                        theme: theme as ThemeTokens,
+                                        options: {
+                                            includeTheme: false,
+                                            includeTableOfContents: false,
+                                            pageSize: 'A4' as const,
+                                            orientation: 'portrait' as const,
+                                            margins: { top: 10, right: 10, bottom: 10, left: 10 },
+                                            fontSize: 12,
+                                            headerFooter: false,
+                                            embedImages: false,
+                                            syntaxHighlight: false,
+                                        },
+                                        metadata: await buildExportMetadata(),
+                                        onProgress: (p: number) => setExportProgress(p),
+                                    };
+                                    const result = await ExportOrchestrator.export(format, input);
+                                    await triggerDownload(result.blob, result.filename);
+                                    toast.success(`Exported ${result.filename}`);
+                                } catch (error) {
+                                    toast.error(error instanceof Error ? error.message : 'Export failed');
+                                } finally {
+                                    setExporting(false);
+                                    setExportProgress(undefined);
+                                }
+                            })();
+                            return;
+                        }
                         setExportFormat(format);
                         setOptionsOpen(true);
                     }}
@@ -371,6 +425,54 @@ export function Header() {
                     <ArrowUpDown className="w-5 h-5" />
                 </button>
 
+                <button
+                    type="button"
+                    className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors"
+                    title="Copy Markdown"
+                    aria-label="Copy markdown to clipboard"
+                    onClick={() => {
+                        void navigator.clipboard.writeText(markdown).then(
+                            () => toast.success('Markdown copied!'),
+                            () => toast.error('Copy failed')
+                        );
+                    }}
+                >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                </button>
+
+                <div className="hidden md:flex gap-1 border-l border-[var(--header-border)] pl-2 ml-1" role="toolbar" aria-label="View mode">
+                    <button
+                        type="button"
+                        onClick={() => setViewMode('editor')}
+                        aria-pressed={viewMode === 'editor'}
+                        title="Editor only"
+                        aria-label="Editor only"
+                        className={`p-2 rounded transition-colors ${viewMode === 'editor' ? 'bg-[var(--header-hover)]' : 'hover:bg-[var(--header-hover)]'}`}
+                    >
+                        <SquarePen className="w-5 h-5" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setViewMode('split')}
+                        aria-pressed={viewMode === 'split'}
+                        title="Split view"
+                        aria-label="Split view"
+                        className={`p-2 rounded transition-colors ${viewMode === 'split' ? 'bg-[var(--header-hover)]' : 'hover:bg-[var(--header-hover)]'}`}
+                    >
+                        <Columns2 className="w-5 h-5" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setViewMode('preview')}
+                        aria-pressed={viewMode === 'preview'}
+                        title="Preview only"
+                        aria-label="Preview only"
+                        className={`p-2 rounded transition-colors ${viewMode === 'preview' ? 'bg-[var(--header-hover)]' : 'hover:bg-[var(--header-hover)]'}`}
+                    >
+                        <Eye className="w-5 h-5" />
+                    </button>
+                </div>
+
                 <Dialog.Root open={settingsOpen} onOpenChange={setSettingsOpen}>
                     <Dialog.Trigger asChild>
                         <button
@@ -413,8 +515,15 @@ export function Header() {
                                             Font Size
                                             <input
                                                 type="number"
+                                                min={8}
+                                                max={72}
+                                                step={1}
                                                 value={theme.editor.fontSize}
-                                                onChange={(e) => setTheme({ ...theme, editor: { ...theme.editor, fontSize: parseInt(e.target.value) } })}
+                                                onChange={(e) => {
+                                                    const n = parseInt(e.target.value, 10);
+                                                    const clamped = Number.isFinite(n) ? Math.min(72, Math.max(8, n)) : 14;
+                                                    setTheme({ ...theme, editor: { ...theme.editor, fontSize: clamped } });
+                                                }}
                                                 className="w-full bg-[var(--sidebar-input-bg)] border border-[var(--sidebar-border)] rounded px-2 py-1 mt-1 text-[var(--sidebar-fg)]"
                                             />
                                         </label>
@@ -427,10 +536,54 @@ export function Header() {
                                 >
                                     Reset to Defaults
                                 </button>
+
+                                <div>
+                                    <h3 className="font-medium text-[var(--sidebar-muted)] text-sm uppercase tracking-wider mb-2">Workspace backup</h3>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void buildWorkspaceBackup().then(
+                                                    async ({ blob, filename }) => {
+                                                        await triggerDownload(blob, filename);
+                                                        toast.success(`Backup exported (${filename})`);
+                                                    },
+                                                    (error) => toast.error(error instanceof Error ? error.message : 'Backup failed')
+                                                );
+                                            }}
+                                            className="flex-1 px-3 py-2 rounded bg-[var(--button-secondary-bg)] hover:bg-[var(--button-secondary-hover)] text-[var(--button-fg)] font-medium transition-colors"
+                                        >
+                                            Export all
+                                        </button>
+                                        <label
+                                            htmlFor="backup-restore-input"
+                                            className="flex-1 px-3 py-2 rounded bg-[var(--button-secondary-bg)] hover:bg-[var(--button-secondary-hover)] text-[var(--button-fg)] font-medium transition-colors cursor-pointer text-center"
+                                        >
+                                            Restore…
+                                        </label>
+                                    </div>
+                                    <input
+                                        id="backup-restore-input"
+                                        type="file"
+                                        accept="application/json,.json"
+                                        className="sr-only"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            e.target.value = '';
+                                            if (!file) return;
+                                            setPendingBackupFile(file);
+                                            setOpenBackupConfirm(true);
+                                        }}
+                                    />
+                                    <p className="mt-2 text-xs text-[var(--sidebar-muted)]">
+                                        Export includes all projects, files and theme. Restore replaces everything.
+                                    </p>
+                                </div>
                             </div>
                             <Dialog.Close asChild>
                                 <button
                                     type="button"
+                                    aria-label="Close settings"
                                     className="absolute top-4 right-4 p-1 hover:bg-[var(--sidebar-hover)] rounded text-[var(--sidebar-fg)]"
                                 >
                                     ×
@@ -460,6 +613,30 @@ export function Header() {
                 confirmText="Save as new file"
                 cancelText="Keep unsaved"
                 onConfirm={handleImportConfirm}
+            />
+
+            <ConfirmDialog
+                open={openBackupConfirm}
+                onOpenChange={(open) => {
+                    setOpenBackupConfirm(open);
+                    if (!open) setPendingBackupFile(null);
+                }}
+                title="Restore backup?"
+                description={`"${pendingBackupFile?.name ?? 'backup'}" will REPLACE all projects, files and theme. This cannot be undone.`}
+                confirmText="Replace everything"
+                cancelText="Cancel"
+                destructive
+                onConfirm={async () => {
+                    if (!pendingBackupFile) return;
+                    try {
+                        const { projects, files } = await restoreWorkspaceBackup(pendingBackupFile);
+                        toast.success(`Restored ${projects} projects, ${files} files`);
+                        setSettingsOpen(false);
+                    } catch (error) {
+                        toast.error(error instanceof Error ? error.message : 'Restore failed');
+                        throw error;
+                    }
+                }}
             />
         </header>
     );

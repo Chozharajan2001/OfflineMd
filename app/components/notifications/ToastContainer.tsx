@@ -21,14 +21,13 @@ const MAX_VISIBLE_TOASTS = 4;
  * - Fixed position, high z-index
  */
 export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
-  // Only show most recent toasts
+  // Only show most recent toasts (store itself is capped; this is the view window)
   const visibleToasts = toasts.slice(-MAX_VISIBLE_TOASTS);
 
   return (
     <div
       className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-md pointer-events-auto"
       aria-live="polite"
-      aria-label="Notifications"
     >
       {visibleToasts.map((toast) => (
         <Toast key={toast.id} toast={toast} onClose={onRemove} />

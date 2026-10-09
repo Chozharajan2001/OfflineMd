@@ -64,8 +64,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.style.setProperty('--sidebar-bg', theme.ui.background);
         root.style.setProperty('--sidebar-fg', theme.ui.foreground);
         root.style.setProperty('--sidebar-border', theme.ui.border);
-        root.style.setProperty('--sidebar-muted', '#6b7280');
-        root.style.setProperty('--sidebar-icon', '#9ca3af');
+        root.style.setProperty('--sidebar-muted', isDark ? '#a1a1aa' : '#52525b');
+        root.style.setProperty('--sidebar-icon', isDark ? '#a1a1aa' : '#52525b');
         root.style.setProperty('--sidebar-input-bg', theme.ui.border);
         root.style.setProperty('--sidebar-hover', state(0.05));
 

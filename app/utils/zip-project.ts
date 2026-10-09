@@ -11,8 +11,10 @@ function sanitizeSegment(value: string): string {
     const cleaned = value
         .replace(/[\\/:*?"<>|]/g, '_')
         .replace(/\s+/g, ' ')
+        .replace(/^\.+/, '')
         .trim();
-    return cleaned || 'untitled';
+    if (!cleaned || /^\.+$/.test(cleaned)) return 'untitled';
+    return cleaned;
 }
 
 function uniqueName(base: string, used: Set<string>): string {
@@ -32,7 +34,7 @@ export async function buildProjectZip(projectId: number): Promise<BuildZipResult
         throw new Error('Project not found');
     }
 
-    const nodes = await db.nodes.where('projectId').equals(projectId).toArray();
+    const nodes = (await db.nodes.where('projectId').equals(projectId).toArray()).filter((n) => !n.deletedAt);
     const nodesByParent = new Map<number | null, FileNode[]>();
     for (const node of nodes) {
         const parent = node.parentId ?? null;

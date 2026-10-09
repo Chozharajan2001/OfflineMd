@@ -75,10 +75,17 @@ export function InputDialog({
       setSubmitting(true);
       await onSubmit(value.trim());
       onOpenChange(false);
+    } catch {
+      setError('Save failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
+
+  const inputId = useMemo(
+    () => `input-dialog-${title.replace(/\s+/g, '-').toLowerCase()}`,
+    [title]
+  );
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -99,11 +106,18 @@ export function InputDialog({
           ) : null}
 
           <div className="mt-4">
+            <label htmlFor={inputId} className="sr-only">
+              {title}
+            </label>
             <input
+              id={inputId}
               ref={inputRef}
               type={inputType}
               value={value}
               placeholder={placeholder}
+              aria-label={title}
+              aria-invalid={!!error}
+              aria-describedby={error ? `${inputId}-error` : description ? descriptionId : undefined}
               onChange={(e) => {
                 setValue(e.target.value);
                 if (error) runValidation(e.target.value);
@@ -113,7 +127,7 @@ export function InputDialog({
               }}
               className="w-full rounded border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-[var(--input-fg)] outline-none focus:ring-2 focus:ring-[var(--accent)]"
             />
-            {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
+            {error ? <p id={`${inputId}-error`} role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
           </div>
 
           <div className="mt-4 flex justify-end gap-2">

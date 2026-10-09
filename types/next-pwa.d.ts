@@ -1,5 +1,5 @@
 declare module 'next-pwa' {
-    import { NextConfig } from 'next';
-    function withPWA(config: any): (nextConfig: NextConfig) => NextConfig;
+    import type { NextConfig } from 'next';
+    function withPWA(config: NextConfig): (nextConfig: NextConfig) => NextConfig;
     export default withPWA;
 }

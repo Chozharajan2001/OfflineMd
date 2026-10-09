@@ -1,7 +1,24 @@
 import type { ThemeTokens } from '../types';
+import { safeFontFamily, safeFontSize, safeHex } from './theme-validation';
 
 export function themeToCSS(theme: ThemeTokens): string {
-    const { ui, editor, preview } = theme;
+    const ui = {
+        background: safeHex(theme.ui.background, '#ffffff'),
+        foreground: safeHex(theme.ui.foreground, '#111111'),
+        border: safeHex(theme.ui.border, '#e5e5e5'),
+        accent: safeHex(theme.ui.accent, '#2563eb'),
+    };
+    const editor = {
+        background: safeHex(theme.editor.background, '#f5f5f5'),
+        foreground: safeHex(theme.editor.foreground, '#111111'),
+        fontFamily: safeFontFamily(theme.editor.fontFamily, "'Fira Code', monospace"),
+    };
+    const preview = {
+        background: safeHex(theme.preview.background, '#ffffff'),
+        foreground: safeHex(theme.preview.foreground, '#111111'),
+        fontFamily: safeFontFamily(theme.preview.fontFamily),
+        fontSize: safeFontSize(theme.preview.fontSize, 16),
+    };
     return `
 /* CSS Variables */
 :root {

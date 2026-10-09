@@ -51,8 +51,8 @@ export class ExportService {
         });
 
         const buffer = await Packer.toBuffer(doc);
-        // Cast buffer to any to avoid TS conflict between NodeJS Buffer and Browser BlobPart
-        const blob = new Blob([buffer as any], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        // Node Buffer → BlobPart via Uint8Array view (avoids Buffer/DOM lib conflict)
+        const blob = new Blob([new Uint8Array(buffer) as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
         saveAs(blob, `${filename}.docx`);
     }
 

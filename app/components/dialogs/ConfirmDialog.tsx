@@ -35,8 +35,12 @@ export function ConfirmDialog({
   destructive = false,
 }: ConfirmDialogProps) {
   const handleConfirm = async () => {
-    await onConfirm();
-    onOpenChange(false);
+    try {
+      await onConfirm();
+      onOpenChange(false);
+    } catch {
+      // Keep dialog open on failure so the error toast stays contextual
+    }
   };
 
   return (
@@ -72,8 +76,7 @@ export function ConfirmDialog({
               </button>
             </Dialog.Close>
             
-            <Dialog.Close asChild>
-              <button
+            <button
                 onClick={handleConfirm}
                 className={`flex-1 px-4 py-2 rounded transition-colors font-medium
                           focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
@@ -84,7 +87,6 @@ export function ConfirmDialog({
               >
                 {confirmText}
               </button>
-            </Dialog.Close>
           </div>
           
           {/* Close button (X icon) */}

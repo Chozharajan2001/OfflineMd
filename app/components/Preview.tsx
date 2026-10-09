@@ -4,6 +4,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { useMarkdownStore } from '../store';
 import { markdownParser } from '../services/MarkdownParser';
+import { safeFontFamily, safeHex } from '../../src/export/utils/theme-validation';
+
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
+        const rel = (node.getAttribute('rel') || '').split(/\s+/).filter(Boolean);
+        if (!rel.includes('noopener')) rel.push('noopener');
+        if (!rel.includes('noreferrer')) rel.push('noreferrer');
+        node.setAttribute('rel', rel.join(' '));
+    }
+});
 
 // Generic debounce that preserves argument types
 function debounce<A extends unknown[], R>(func: (...args: A) => R, delay: number): (...args: A) => void {
@@ -31,8 +41,9 @@ export function Preview() {
     }, []);
 
     // Debounced markdown parsing with sanitization
+    const parseSeq = useRef(0);
     const debouncedParse = useRef(
-        debounce(async (md: string) => {
+        debounce(async (md: string, seq: number) => {
             const html = await markdownParser.parse(md);
             // Additional layer of sanitization with DOMPurify for defense-in-depth
             const safeHtml = DOMPurify.sanitize(html, {
@@ -45,12 +56,16 @@ export function Preview() {
                     'blockquote', 'pre', 'code',
                     'table', 'thead', 'tbody', 'tr', 'th', 'td',
                     'div', 'span', 'details', 'summary',
-                    'sup', 'sub'
+                    'sup', 'sub',
+                    'math', 'semantics', 'annotation', 'mrow', 'mi', 'mo', 'mn',
+                    'msup', 'msub', 'msubsup', 'mfrac', 'msqrt', 'mroot', 'mtext',
+                    'mspace', 'mover', 'munder', 'munderover', 'mtable', 'mtr', 'mtd'
                 ],
-                ALLOWED_ATTR: ['className', 'class', 'href', 'src', 'alt', 'title', 'target', 'rel'],
+                ALLOWED_ATTR: ['className', 'class', 'href', 'src', 'alt', 'title', 'target', 'rel', 'aria-hidden', 'display', 'encoding'],
                 FORBID_ATTR: ['style', 'onclick', 'onerror', 'onload']
             });
-            setRenderedHtml(safeHtml);
+            if (parseSeq.current !== seq) return;
+            setRenderedHtml(safeHtml as string);
         }, 150)
     );
 
@@ -60,9 +75,10 @@ export function Preview() {
     useEffect(() => {
         if (!isClient) return;
         latestMarkdownRef.current = markdown;
+        parseSeq.current += 1;
 
         // Cancel previous parse if new markdown arrives quickly
-        debouncedParse.current(markdown);
+        debouncedParse.current(markdown, parseSeq.current);
 
         // Cleanup function to cancel stale parses
         return () => {
@@ -102,11 +118,13 @@ export function Preview() {
             mermaid.initialize({
                 startOnLoad: false,
                 theme: theme.preview.background === '#ffffff' ? 'default' : 'dark',
-                securityLevel: 'loose',
+                securityLevel: 'strict',
             });
 
             // Convert fenced mermaid blocks into mermaid containers for rendering
-            document.querySelectorAll('pre > code.language-mermaid').forEach((codeEl) => {
+            // Scoped to this preview only so other page nodes are never hijacked.
+            const scope: ParentNode = previewRef.current ?? document;
+            scope.querySelectorAll('pre > code.language-mermaid').forEach((codeEl) => {
                 const text = codeEl.textContent || '';
                 const wrapper = document.createElement('div');
                 wrapper.className = 'mermaid';
@@ -117,7 +135,9 @@ export function Preview() {
                 }
             });
 
-            const mermaidNodes = Array.from(document.querySelectorAll('.mermaid')) as HTMLElement[];
+            const mermaidNodes = Array.from(scope.querySelectorAll('.mermaid')).filter(
+                (n) => previewRef.current?.contains(n as Node)
+            ) as HTMLElement[];
             if (!cancelled && mermaidNodes.length > 0) {
                 await mermaid.run({ nodes: mermaidNodes }).catch((err) => console.debug('Mermaid rendering validation:', err));
             }
@@ -127,36 +147,43 @@ export function Preview() {
     }, [isClient, hasMermaidDiagram, renderedHtml, theme]);
 
     // Inline styles for rich typography
+    const accent = safeHex(theme.ui.accent);
+    const border = safeHex(theme.ui.border);
+    const uiBg = safeHex(theme.ui.background);
+    const uiFg = safeHex(theme.ui.foreground);
+    const edBg = safeHex(theme.editor.background);
+    const edFg = safeHex(theme.editor.foreground);
+    const edFont = safeFontFamily(theme.editor.fontFamily, "'Fira Code', monospace");
     const proseStyles = `
-        .preview-content h1 { font-size: 2.25em; font-weight: 700; margin-top: 0; margin-bottom: 0.8em; line-height: 1.2; color: ${theme.ui.accent}; }
+        .preview-content h1 { font-size: 2.25em; font-weight: 700; margin-top: 0; margin-bottom: 0.8em; line-height: 1.2; color: ${accent}; }
         .preview-content h2 { font-size: 1.75em; font-weight: 600; margin-top: 1.6em; margin-bottom: 0.6em; line-height: 1.3; }
         .preview-content h3 { font-size: 1.5em; font-weight: 600; margin-top: 1.4em; margin-bottom: 0.6em; line-height: 1.4; }
         .preview-content h4 { font-size: 1.25em; font-weight: 600; margin-top: 1.2em; margin-bottom: 0.5em; line-height: 1.5; }
         .preview-content h5 { font-size: 1.1em; font-weight: 600; margin-top: 1em; margin-bottom: 0.4em; line-height: 1.5; }
-        .preview-content h6 { font-size: 1em; font-weight: 600; margin-top: 1em; margin-bottom: 0.4em; line-height: 1.5; color: ${theme.ui.foreground}80; }
+        .preview-content h6 { font-size: 1em; font-weight: 600; margin-top: 1em; margin-bottom: 0.4em; line-height: 1.5; color: ${uiFg}80; }
 
         .preview-content p { margin-top: 0; margin-bottom: 1.25em; line-height: 1.75; }
 
-        .preview-content a { color: ${theme.ui.accent}; text-decoration: underline; text-underline-offset: 2px; }
+        .preview-content a { color: ${accent}; text-decoration: underline; text-underline-offset: 2px; }
         .preview-content a:hover { text-decoration: none; }
 
-        .preview-content strong { font-weight: 600; color: ${theme.ui.accent}; }
+        .preview-content strong { font-weight: 600; color: ${accent}; }
         .preview-content em { font-style: italic; }
 
         .preview-content ul, .preview-content ol { margin-top: 0; margin-bottom: 1.25em; padding-left: 2em; }
         .preview-content li { margin-top: 0.5em; margin-bottom: 0.5em; line-height: 1.75; }
-        .preview-content ul li::marker { color: ${theme.ui.accent}; }
-        .preview-content ol li::marker { color: ${theme.ui.accent}; font-weight: 500; }
+        .preview-content ul li::marker { color: ${accent}; }
+        .preview-content ol li::marker { color: ${accent}; font-weight: 500; }
 
         .preview-content ul ul, .preview-content ol ol,
         .preview-content ul ol, .preview-content ol ul { margin-top: 0.5em; margin-bottom: 0.5em; }
 
         .preview-content blockquote {
-            border-left: 4px solid ${theme.ui.accent};
+            border-left: 4px solid ${accent};
             padding-left: 1em;
             margin-top: 1.5em; margin-bottom: 1.5em;
             font-style: italic;
-            background: ${theme.ui.background}10;
+            background: ${uiBg}10;
             padding: 1em;
             border-radius: 0 4px 4px 0;
         }
@@ -164,28 +191,28 @@ export function Preview() {
 
         .preview-content hr {
             border: none;
-            border-top: 2px solid ${theme.ui.border};
+            border-top: 2px solid ${border};
             margin-top: 2em; margin-bottom: 2em;
         }
 
         .preview-content code {
-            font-family: ${theme.editor.fontFamily};
+            font-family: ${edFont};
             font-size: 0.9em;
-            background: ${theme.ui.background}40;
+            background: ${uiBg}40;
             padding: 0.2em 0.4em;
             border-radius: 4px;
-            color: ${theme.ui.accent};
+            color: ${accent};
         }
 
         .preview-content pre {
-            font-family: ${theme.editor.fontFamily};
-            background: ${theme.editor.background};
-            color: ${theme.editor.foreground};
+            font-family: ${edFont};
+            background: ${edBg};
+            color: ${edFg};
             padding: 1.25em;
             margin-top: 1.5em; margin-bottom: 1.5em;
             border-radius: 8px;
             overflow-x: auto;
-            border: 1px solid ${theme.ui.border};
+            border: 1px solid ${border};
         }
         .preview-content pre code {
             background: transparent;
@@ -206,16 +233,16 @@ export function Preview() {
         .preview-content th, .preview-content td {
             padding: 0.75em 1em;
             text-align: left;
-            border: 1px solid ${theme.ui.border};
+            border: 1px solid ${border};
         }
         .preview-content th {
             font-weight: 600;
-            background: ${theme.ui.background}40;
+            background: ${uiBg}40;
             position: sticky;
             top: 0;
         }
-        .preview-content tr:nth-child(even) { background: ${theme.ui.background}20; }
-        .preview-content tr:hover { background: ${theme.ui.background}40; }
+        .preview-content tr:nth-child(even) { background: ${uiBg}20; }
+        .preview-content tr:hover { background: ${uiBg}40; }
 
         .preview-content img {
             max-width: 100%;
@@ -229,9 +256,9 @@ export function Preview() {
             margin-top: 1em;
             margin-bottom: 1em;
             padding: 0.5em;
-            border: 1px solid ${theme.ui.border};
+            border: 1px solid ${border};
             border-radius: 4px;
-            background: ${theme.ui.background}20;
+            background: ${uiBg}20;
         }
         .preview-content summary {
             cursor: pointer;
@@ -243,7 +270,7 @@ export function Preview() {
         }
 
         .preview-content mark {
-            background: ${theme.ui.accent}30;
+            background: ${accent}30;
             padding: 0.1em 0.2em;
             border-radius: 2px;
         }
@@ -264,8 +291,8 @@ export function Preview() {
 
         /* Highlight.js theme overrides for dark/light mode */
         .preview-content .hljs {
-            background: ${theme.editor.background};
-            color: ${theme.editor.foreground};
+            background: ${edBg};
+            color: ${edFg};
             padding: 0;
         }
 
@@ -300,6 +327,9 @@ export function Preview() {
     return (
         <div
             ref={previewRef}
+            role="region"
+            aria-label="Markdown preview"
+            tabIndex={0}
             className="h-full w-full overflow-auto p-8"
             style={{
                 backgroundColor: theme.preview.background,

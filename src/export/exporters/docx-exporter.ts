@@ -58,11 +58,12 @@ class MarkdownParser {
             } else if (line.match(/^\d+\.\s/)) {
                 result.push({ type: 'orderedList', content: line.replace(/^\d+\.\s/, ''), items: [line.replace(/^\d+\.\s/, '')] });
             } else if (line.match(/^\|/) && line.match(/\|$/)) {
-                // Skip markdown table separator rows like |---|---|
-                if (line.match(/^[\s|-]+$/)) {
+                // Skip markdown table separator rows like |---|---| (with optional : alignment)
+                if (line.match(/^[\s|:|-]+$/)) {
                     continue;
                 }
-                const cells = line.split('|').filter((c, idx) => idx !== 0 && idx !== line.split('|').length - 1).map(c => c.trim());
+                const parts = line.split('|');
+                const cells = parts.filter((c, idx) => idx !== 0 && idx !== parts.length - 1).map(c => c.trim());
                 if (cells.length > 0) {
                     const tableRow: string[] = [];
                     for (const cell of cells) {

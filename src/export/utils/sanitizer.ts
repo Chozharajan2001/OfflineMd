@@ -1,5 +1,17 @@
 import DOMPurify from 'dompurify';
 
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A') {
+    const target = node.getAttribute('target');
+    if (target === '_blank') {
+      const rel = (node.getAttribute('rel') || '').split(/\s+/).filter(Boolean);
+      if (!rel.includes('noopener')) rel.push('noopener');
+      if (!rel.includes('noreferrer')) rel.push('noreferrer');
+      node.setAttribute('rel', rel.join(' '));
+    }
+  }
+});
+
 /**
  * Sanitizes HTML content to prevent XSS attacks while preserving markdown-generated content.
  * Uses DOMPurify for robust security with custom configuration for markdown use cases.
@@ -10,7 +22,7 @@ import DOMPurify from 'dompurify';
 export async function sanitizeHTML(html: string): Promise<string> {
   // Configure DOMPurify for markdown-rendered content
   const clean = DOMPurify.sanitize(html, {
-    // Allowed HTML tags for markdown content
+    // Allowed HTML tags for markdown content (+ KaTeX math output)
     ALLOWED_TAGS: [
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
       'p', 'br', 'hr',
@@ -21,16 +33,20 @@ export async function sanitizeHTML(html: string): Promise<string> {
       'table', 'thead', 'tbody', 'tr', 'th', 'td',
       'div', 'span', 'details', 'summary',
       'sup', 'sub',
-      'figure', 'figcaption'
+      'figure', 'figcaption',
+      'math', 'semantics', 'annotation', 'mrow', 'mi', 'mo', 'mn',
+      'msup', 'msub', 'msubsup', 'mfrac', 'msqrt', 'mroot', 'mtext',
+      'mspace', 'mover', 'munder', 'munderover', 'mtable', 'mtr', 'mtd'
     ],
-    
+
     // Allowed attributes
     ALLOWED_ATTR: [
       'href', 'src', 'alt', 'title',
       'class', 'className',
       'target', 'rel',
       'colspan', 'rowspan',
-      'id', 'name'
+      'id', 'name',
+      'aria-hidden', 'display', 'encoding'
     ],
     
     // URI validation - only allow safe protocols

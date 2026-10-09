@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useRef, useState, useEffect } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { Folder, FileText, Plus, Trash2, ChevronRight, ChevronDown, FolderPlus, FilePlus, Download } from 'lucide-react';
 import { useMarkdownStore } from '../store';
 import { db, FileNode } from '../services/Database';
@@ -36,7 +37,14 @@ export function Sidebar() {
         () => (activeProjectId ? db.nodes.where('projectId').equals(activeProjectId).toArray() : []),
         [activeProjectId]
     );
-    const projectNodes = useMemo(() => projectNodesResult || [], [projectNodesResult]);
+    const projectNodes = useMemo(
+        () => (projectNodesResult || []).filter((n) => !n.deletedAt),
+        [projectNodesResult]
+    );
+    const trashedNodes = useMemo(
+        () => (projectNodesResult || []).filter((n) => n.deletedAt),
+        [projectNodesResult]
+    );
     const [expandedFolders, setExpandedFolders] = useState<Record<number, boolean>>({});
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +58,9 @@ export function Sidebar() {
     const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
     const [openRenameNode, setOpenRenameNode] = useState(false);
     const [pendingRenameNode, setPendingRenameNode] = useState<FileNode | null>(null);
+    const [openMoveNode, setOpenMoveNode] = useState(false);
+    const [pendingMoveNode, setPendingMoveNode] = useState<FileNode | null>(null);
+    const [moveTargetId, setMoveTargetId] = useState<string>('root');
     const [contextMenu, setContextMenu] = useState<ContextMenuState>({
         open: false,
         x: 0,
@@ -136,12 +147,108 @@ export function Sidebar() {
     };
 
     const deleteNode = async (id: number) => {
-        await db.nodes.delete(id);
-        if (activeFileId === id) {
+        // Soft-delete: move to trash (filter excludes deletedAt). Folder delete cascades.
+        const now = new Date();
+        const all = activeProjectId
+            ? await db.nodes.where('projectId').equals(activeProjectId).toArray()
+            : await db.nodes.where('id').equals(id).toArray();
+        const ids = new Set<number>([id]);
+        let grew = true;
+        while (grew) {
+            grew = false;
+            for (const n of all) {
+                if (typeof n.id === 'number' && !ids.has(n.id) && n.parentId != null && ids.has(n.parentId)) {
+                    ids.add(n.id);
+                    grew = true;
+                }
+            }
+        }
+        for (const delId of ids) {
+            await db.nodes.update(delId, { deletedAt: now, updatedAt: now });
+        }
+        if (activeFileId != null && ids.has(activeFileId)) {
             setActiveFile(null);
             setMarkdown('');
             resetSaveState();
         }
+        return [...ids];
+    };
+
+    const restoreNode = async (id: number) => {
+        // Restore node + ancestors so it is reachable in the tree
+        const now = new Date();
+        const node = await db.nodes.get(id);
+        if (!node) return;
+        let parentId = node.parentId;
+        while (typeof parentId === 'number') {
+            await db.nodes.update(parentId, { deletedAt: null, updatedAt: now });
+            const parent = await db.nodes.get(parentId);
+            parentId = parent?.parentId ?? null;
+        }
+        await db.nodes.update(id, { deletedAt: null, updatedAt: now });
+        toast.success('Item restored');
+    };
+
+    const purgeNode = async (id: number) => {
+        // Permanent delete (node + descendants)
+        const all = activeProjectId
+            ? await db.nodes.where('projectId').equals(activeProjectId).toArray()
+            : [];
+        const ids = new Set<number>([id]);
+        let grew = true;
+        while (grew) {
+            grew = false;
+            for (const n of all) {
+                if (typeof n.id === 'number' && !ids.has(n.id) && n.parentId != null && ids.has(n.parentId)) {
+                    ids.add(n.id);
+                    grew = true;
+                }
+            }
+        }
+        for (const delId of ids) {
+            await db.nodes.delete(delId);
+        }
+        if (activeFileId != null && ids.has(activeFileId)) {
+            setActiveFile(null);
+            setMarkdown('');
+            resetSaveState();
+        }
+    };
+
+    const emptyTrash = async () => {
+        for (const n of trashedNodes) {
+            if (typeof n.id === 'number') await purgeNode(n.id);
+        }
+        toast.success('Trash emptied');
+    };
+
+    const moveFolders = useMemo(
+        () => projectNodes.filter((n) => n.type === 'folder' && typeof n.id === 'number'),
+        [projectNodes]
+    );
+
+    const handleMoveConfirm = async () => {
+        if (!pendingMoveNode?.id) return;
+        const target: number | null = moveTargetId === 'root' ? null : Number(moveTargetId);
+        // Prevent moving a folder into itself or its descendant
+        if (target != null) {
+            if (target === pendingMoveNode.id) {
+                toast.error('Cannot move a folder into itself.');
+                return;
+            }
+            let p = nodeById.get(target)?.parentId ?? null;
+            while (p != null) {
+                if (p === pendingMoveNode.id) {
+                    toast.error('Cannot move a folder into its own child.');
+                    return;
+                }
+                p = nodeById.get(p)?.parentId ?? null;
+            }
+        }
+        await db.nodes.update(pendingMoveNode.id, { parentId: target, updatedAt: new Date() });
+        toast.success(`Moved "${pendingMoveNode.name}"`);
+        setOpenMoveNode(false);
+        setPendingMoveNode(null);
     };
 
     const renameNode = async (id: number, name: string) => {
@@ -153,7 +260,7 @@ export function Sidebar() {
 
     const loadFile = async (id: number) => {
         const file = await db.nodes.get(id);
-        if (file && file.type === 'file') {
+        if (file && file.type === 'file' && !file.deletedAt) {
             resetSaveState();
             setActiveFile(id);
             setMarkdown(file.content || '');
@@ -179,15 +286,37 @@ export function Sidebar() {
 
     const handleDeleteConfirm = () => {
         if (!pendingDeleteId) return;
-        deleteNode(pendingDeleteId);
+        const targetId = pendingDeleteId;
         setPendingDeleteId(null);
-        toast.success('Item deleted successfully');
+        void deleteNode(targetId).then((ids) => {
+            toast.success('Moved to trash', {
+                duration: 6000,
+                actionLabel: 'Undo',
+                onAction: () => {
+                    void (async () => {
+                        const now = new Date();
+                        for (const restoreId of ids) {
+                            await db.nodes.update(restoreId, { deletedAt: null, updatedAt: now });
+                        }
+                        toast.success('Restored');
+                    })();
+                },
+            });
+        });
     };
 
     const handleRenameNodeSubmit = async (name: string) => {
         if (!pendingRenameNode?.id) return;
-        await renameNode(pendingRenameNode.id, name);
-        toast.success(`Renamed to "${name}"`);
+        const targetId = pendingRenameNode.id;
+        const oldName = pendingRenameNode.name;
+        await renameNode(targetId, name);
+        toast.success(`Renamed to "${name}"`, {
+            duration: 6000,
+            actionLabel: 'Undo',
+            onAction: () => {
+                void renameNode(targetId, oldName).then(() => toast.success(`Restored "${oldName}"`));
+            },
+        });
         setOpenRenameNode(false);
         setPendingRenameNode(null);
     };
@@ -208,10 +337,15 @@ export function Sidebar() {
     };
 
     const openContextMenuAt = (node: FileNode, x: number, y: number) => {
+        // Clamp to viewport so the menu never renders off-screen (m-16)
+        const MENU_W = 200;
+        const MENU_H = 180;
+        const cx = Math.min(Math.max(8, x), Math.max(8, window.innerWidth - MENU_W - 8));
+        const cy = Math.min(Math.max(8, y), Math.max(8, window.innerHeight - MENU_H - 8));
         setContextMenu({
             open: true,
-            x,
-            y,
+            x: cx,
+            y: cy,
             node,
         });
     };
@@ -225,7 +359,7 @@ export function Sidebar() {
         openContextMenuAt(node, rect.left + 8, rect.bottom + 4);
     };
 
-    const handleContextAction = async (action: 'open' | 'new-file' | 'rename' | 'delete') => {
+    const handleContextAction = async (action: 'open' | 'new-file' | 'rename' | 'delete' | 'move') => {
         const targetNode = contextMenu.node;
         if (!targetNode?.id) return;
 
@@ -246,6 +380,13 @@ export function Sidebar() {
         if (action === 'rename') {
             setPendingRenameNode(targetNode);
             setOpenRenameNode(true);
+            return;
+        }
+
+        if (action === 'move') {
+            setPendingMoveNode(targetNode);
+            setMoveTargetId('root');
+            setOpenMoveNode(true);
             return;
         }
 
@@ -434,14 +575,17 @@ export function Sidebar() {
     };
 
     const RecentsList = () => {
+        // NOTE: Dexie `reverse()` before `sortBy()` is ignored — sortBy always
+        // returns ascending. Take the tail then reverse to show newest 5.
+        // Verified against live data shape (updatedAt Date); keep if index added later
+        // prefer: db.nodes.orderBy('updatedAt').reverse().limit(5)
         const recents = useLiveQuery(() =>
             db.nodes
                 .where('type').equals('file')
-                .reverse()
                 .sortBy('updatedAt')
         ) || [];
 
-        const recentFiles = recents.slice(0, 5);
+        const recentFiles = recents.filter((f) => !f.deletedAt).slice(-5).reverse();
 
         if (recentFiles.length === 0) return <div className="text-[var(--sidebar-muted)] text-xs italic">No recent files</div>;
 
@@ -477,7 +621,10 @@ export function Sidebar() {
             )}
 
             {/* Sidebar with responsive classes */}
-            <div
+            <aside
+                aria-label="Projects and files"
+                aria-hidden={!sidebarVisible && !isMobileOpen}
+                inert={!sidebarVisible && !isMobileOpen ? true : undefined}
                 className={`
           h-full bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] flex flex-col
           fixed lg:static top-0 left-0 z-50
@@ -547,7 +694,7 @@ export function Sidebar() {
                 </div>
 
                 {/* File Tree */}
-                <div className="flex-1 overflow-auto p-2" role="group" aria-label="File Explorer">
+                <div className="flex-1 overflow-auto p-2" role="region" aria-label="File Explorer" tabIndex={0}>
                     {activeProjectId ? (
                         <>
                             <div className="flex justify-between items-center px-2 mb-2">
@@ -621,7 +768,54 @@ export function Sidebar() {
                         </div>
                     )}
                 </div>
-            </div>
+
+                {/* Trash */}
+                {activeProjectId && (
+                    <div className="p-3 border-t border-[var(--sidebar-border)]" role="group" aria-label="Trash">
+                        <div className="flex justify-between items-center mb-2">
+                            <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider">
+                                Trash{trashedNodes.length > 0 ? ` (${trashedNodes.length})` : ''}
+                            </h2>
+                            {trashedNodes.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => void emptyTrash()}
+                                    className="text-xs text-red-500 hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-red-500 rounded px-1"
+                                >
+                                    Empty trash
+                                </button>
+                            )}
+                        </div>
+                        {trashedNodes.length === 0 ? (
+                            <div className="text-[var(--sidebar-muted)] text-xs italic">Trash is empty</div>
+                        ) : (
+                            <div className="space-y-1 max-h-40 overflow-auto" role="region" aria-label="Trashed items" tabIndex={0}>
+                                {trashedNodes.map((node) => (
+                                    <div key={node.id} className="flex items-center gap-1 text-xs text-[var(--sidebar-muted)]">
+                                        <span className="flex-1 truncate">{node.name}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => typeof node.id === 'number' && void restoreNode(node.id)}
+                                            className="px-1.5 py-1 hover:bg-[var(--sidebar-hover)] rounded focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                                            aria-label={`Restore ${node.name}`}
+                                        >
+                                            Restore
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => typeof node.id === 'number' && void purgeNode(node.id).then(() => toast.success('Permanently deleted'))}
+                                            className="px-1.5 py-1 text-red-500 hover:text-red-400 rounded focus:outline-none focus:ring-2 focus:ring-red-500"
+                                            aria-label={`Delete ${node.name} forever`}
+                                        >
+                                            Delete
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </aside>
 
             {/* Context Menu */}
             {contextMenu.open && contextMenu.node && (
@@ -654,6 +848,14 @@ export function Sidebar() {
                             <button
                                 type="button"
                                 role="menuitem"
+                                className="w-full text-left px-3 py-1.5 text-sm text-[var(--dropdown-fg)] hover:bg-[var(--dropdown-hover)] rounded focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                                onClick={() => void handleContextAction('move')}
+                            >
+                                Move to…
+                            </button>
+                            <button
+                                type="button"
+                                role="menuitem"
                                 className="w-full text-left px-3 py-1.5 text-sm text-red-500 hover:bg-[var(--dropdown-hover)] rounded focus:outline-none focus:ring-2 focus:ring-red-500"
                                 onClick={() => void handleContextAction('delete')}
                             >
@@ -677,6 +879,14 @@ export function Sidebar() {
                                 onClick={() => void handleContextAction('rename')}
                             >
                                 Rename
+                            </button>
+                            <button
+                                type="button"
+                                role="menuitem"
+                                className="w-full text-left px-3 py-1.5 text-sm text-[var(--dropdown-fg)] hover:bg-[var(--dropdown-hover)] rounded focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                                onClick={() => void handleContextAction('move')}
+                            >
+                                Move to…
                             </button>
                             <button
                                 type="button"
@@ -717,9 +927,9 @@ export function Sidebar() {
             <ConfirmDialog
                 open={openDeleteNode}
                 onOpenChange={setOpenDeleteNode}
-                title="Delete Item"
-                description="Are you sure you want to delete this item? This action cannot be undone."
-                confirmText="Delete"
+                title="Move to trash?"
+                description="This item will be moved to trash. You can restore it or delete it forever from the Trash section."
+                confirmText="Move to trash"
                 cancelText="Cancel"
                 onConfirm={handleDeleteConfirm}
                 destructive
@@ -740,6 +950,61 @@ export function Sidebar() {
                 validate={(v) => (!v.trim() ? 'Name is required' : null)}
                 submitText="Rename"
             />
+
+            {/* Move To Dialog */}
+            <Dialog.Root
+                open={openMoveNode}
+                onOpenChange={(open) => {
+                    setOpenMoveNode(open);
+                    if (!open) setPendingMoveNode(null);
+                }}
+            >
+                <Dialog.Portal>
+                    <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
+                    <Dialog.Content
+                        aria-describedby="move-dialog-description"
+                        className="fixed top-1/2 left-1/2 w-[360px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 rounded border border-[var(--dialog-border)] bg-[var(--dialog-bg)] p-4 text-[var(--dialog-fg)] shadow-xl z-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    >
+                        <Dialog.Title className="text-base font-semibold">
+                            Move “{pendingMoveNode?.name}”
+                        </Dialog.Title>
+                        <Dialog.Description id="move-dialog-description" className="mt-1 text-sm text-[var(--sidebar-muted)]">
+                            Choose a destination folder.
+                        </Dialog.Description>
+                        <label htmlFor="move-target" className="sr-only">
+                            Destination folder
+                        </label>
+                        <select
+                            id="move-target"
+                            value={moveTargetId}
+                            onChange={(e) => setMoveTargetId(e.target.value)}
+                            className="mt-4 w-full rounded border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-[var(--input-fg)]"
+                        >
+                            <option value="root">Top level</option>
+                            {moveFolders
+                                .filter((f) => f.id !== pendingMoveNode?.id)
+                                .map((f) => (
+                                    <option key={f.id} value={String(f.id)}>
+                                        {f.name}
+                                    </option>
+                                ))}
+                        </select>
+                        <div className="mt-4 flex justify-end gap-2">
+                            <Dialog.Close asChild>
+                                <button className="rounded bg-[var(--button-secondary-bg)] px-3 py-1.5 text-[var(--button-fg)] hover:bg-[var(--button-secondary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
+                                    Cancel
+                                </button>
+                            </Dialog.Close>
+                            <button
+                                onClick={() => void handleMoveConfirm()}
+                                className="rounded bg-[var(--button-primary-bg)] px-3 py-1.5 text-[var(--button-fg)] hover:bg-[var(--button-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                            >
+                                Move
+                            </button>
+                        </div>
+                    </Dialog.Content>
+                </Dialog.Portal>
+            </Dialog.Root>
         </>
     );
 }

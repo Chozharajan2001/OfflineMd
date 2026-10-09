@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import 'highlight.js/styles/github-dark.css';
+import 'katex/dist/katex.min.css';
 import { ThemeProvider } from "./components/ThemeProvider";
 import { ToastContainerWrapper } from './components/notifications';
+import { SwRegister } from "./components/SwRegister";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -17,7 +19,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
     title: "Markdown Converter",
-    description: "A powerful markdown editor and converter with PWA support",
+    description: "A powerful markdown editor and converter with offline support",
     manifest: "/manifest.json",
     appleWebApp: {
         capable: true,
@@ -47,6 +49,7 @@ export default function RootLayout({
                 <ThemeProvider>
                     {children}
                     <ToastContainerWrapper />
+                    <SwRegister />
                 </ThemeProvider>
             </body>
         </html>

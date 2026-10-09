@@ -68,7 +68,8 @@ class MarkdownParser {
             } else if (/^\d+\.\s/.test(trimmed)) {
                 result.push({ type: 'orderedList', content: trimmed.replace(/^\d+\.\s/, '') });
             } else if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-                const cells = line.split('|').filter((c, idx) => idx !== 0 && idx !== line.split('|').length - 1).map(c => c.trim());
+                const parts = line.split('|');
+                const cells = parts.filter((c, idx) => idx !== 0 && idx !== parts.length - 1).map(c => c.trim());
                 if (cells.length > 0 && !line.match(/^[\s|:|-]+$/)) {
                     result.push({ type: 'tableRow', cells });
                 }
@@ -205,6 +206,17 @@ export class PdfExporter implements IExporter {
     private readonly fontCharCache = new Map<string, string>();
     private static readonly MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB per image
     private static readonly MAX_TOTAL_IMAGE_BYTES = 30 * 1024 * 1024; // 30MB per export
+    private static readonly MAX_IMAGE_DIMENSION = 8000; // px, decompression-bomb guard
+
+    private isAllowedImageUrl(url: string): boolean {
+        try {
+            if (url.startsWith('data:image/')) return true;
+            const parsed = new URL(url, 'https://local');
+            return parsed.protocol === 'https:';
+        } catch {
+            return false;
+        }
+    }
 
     async export(input: ExportInput): Promise<ExportResult> {
         const start = performance.now();
@@ -523,9 +535,24 @@ export class PdfExporter implements IExporter {
                         }
                         // Embed image in PDF
                         if (line.imageUrl) {
+                            if (!this.isAllowedImageUrl(line.imageUrl)) {
+                                console.warn('Blocked non-https image URL:', line.imageUrl);
+                                page.drawText(`[Image blocked: ${line.altText || 'external URL'}]`, {
+                                    x: marginLeft,
+                                    y: y - fontSize,
+                                    size: fontSize * 0.9,
+                                    font: helveticaOblique,
+                                    color: rgb(textCol.r * 0.7, textCol.g * 0.7, textCol.b * 0.7)
+                                });
+                                y -= fontSize * 2;
+                                break;
+                            }
                             try {
-                                // Fetch image data
-                                const response = await fetch(line.imageUrl);
+                                // Fetch image data with timeout
+                                const controller = new AbortController();
+                                const timeout = setTimeout(() => controller.abort(), 15000);
+                                const response = await fetch(line.imageUrl, { signal: controller.signal });
+                                clearTimeout(timeout);
                                 if (!response.ok) {
                                     throw new Error(`Image request failed with ${response.status}`);
                                 }
@@ -575,6 +602,9 @@ export class PdfExporter implements IExporter {
                                 }
 
                                 // Calculate dimensions to fit page width
+                                if (embeddedImage.width > PdfExporter.MAX_IMAGE_DIMENSION || embeddedImage.height > PdfExporter.MAX_IMAGE_DIMENSION) {
+                                    throw new Error('Image dimensions too large');
+                                }
                                 const imageScale = Math.min(1, contentWidth / embeddedImage.width);
                                 const imgWidth = embeddedImage.width * imageScale;
                                 const imgHeight = embeddedImage.height * imageScale;
@@ -749,6 +779,9 @@ export class PdfExporter implements IExporter {
                 safe += cached;
                 continue;
             }
+
+            // Bound cache for CJK-heavy docs
+            if (this.fontCharCache.size > 5000) this.fontCharCache.clear();
 
             try {
                 font.widthOfTextAtSize(source, fontSize);

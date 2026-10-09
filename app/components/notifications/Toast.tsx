@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import type { ToastMessage } from './types';
+import { getDefaultDuration } from './types';
 
 export interface ToastProps {
   toast: ToastMessage;
@@ -21,15 +22,23 @@ export interface ToastProps {
  */
 export function Toast({ toast, onClose }: ToastProps) {
   const duration = toast.duration ?? getDefaultDuration(toast.type);
+  const [paused, setPaused] = useState(false);
+  const remaining = useRef(duration);
+  const startedAt = useRef(0);
 
-  // Auto-dismiss after duration
+  // Auto-dismiss after duration, pausable on hover/focus
   useEffect(() => {
+    if (paused) return;
+    startedAt.current = Date.now();
     const timer = setTimeout(() => {
       onClose(toast.id);
-    }, duration);
+    }, remaining.current);
 
-    return () => clearTimeout(timer);
-  }, [toast.id, duration, onClose]);
+    return () => {
+      clearTimeout(timer);
+      remaining.current -= Date.now() - startedAt.current;
+    };
+  }, [toast.id, paused, onClose]);
 
   // Icon and color based on type
   const getTypeStyles = () => {
@@ -81,15 +90,31 @@ export function Toast({ toast, onClose }: ToastProps) {
 
   return (
     <div
-      role="alert"
-      aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
+      role="status"
       className={`relative flex items-start gap-3 p-4 rounded-lg border shadow-lg ${styles.bg} ${styles.border} animate-slide-in-right`}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
     >
       {/* Icon */}
       <div className="flex-shrink-0 mt-0.5">{styles.icon}</div>
 
       {/* Message */}
       <p className="flex-1 text-sm text-white pr-8">{toast.message}</p>
+
+      {/* Action (e.g. Undo) */}
+      {toast.actionLabel && toast.onAction && (
+        <button
+          onClick={() => {
+            toast.onAction?.();
+            onClose(toast.id);
+          }}
+          className="shrink-0 px-2 py-1 text-xs font-semibold bg-white/15 hover:bg-white/25 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
+        >
+          {toast.actionLabel}
+        </button>
+      )}
 
       {/* Close button */}
       <button
@@ -101,25 +126,16 @@ export function Toast({ toast, onClose }: ToastProps) {
       </button>
 
       {/* Progress bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden rounded-b-lg">
+      <div className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden rounded-b-lg" aria-hidden="true">
         <div
           className="h-full bg-white/30 animate-shrink"
           style={{
             animationDuration: `${duration}ms`,
             animationTimingFunction: 'linear',
+            animationPlayState: paused ? 'paused' : 'running',
           }}
         />
       </div>
     </div>
   );
-}
-
-// Helper to get default duration
-function getDefaultDuration(type: 'success' | 'error' | 'warn' | 'info'): number {
-  switch (type) {
-    case 'error':
-      return 6000;
-    default:
-      return 4000;
-  }
 }

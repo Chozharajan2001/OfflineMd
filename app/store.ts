@@ -415,6 +415,8 @@ interface MarkdownStore {
     scrollSyncEnabled: boolean;
     setScrollSyncEnabled: (enabled: boolean) => void;
     toggleScrollSyncEnabled: () => void;
+    viewMode: 'editor' | 'split' | 'preview';
+    setViewMode: (mode: 'editor' | 'split' | 'preview') => void;
 
     // Theme State
     theme: ThemeConfig;
@@ -476,6 +478,8 @@ export const useMarkdownStore = create<MarkdownStore>()(
             scrollSyncEnabled: true,
             setScrollSyncEnabled: (enabled) => set({ scrollSyncEnabled: enabled }),
             toggleScrollSyncEnabled: () => set((state) => ({ scrollSyncEnabled: !state.scrollSyncEnabled })),
+            viewMode: typeof window !== 'undefined' && window.innerWidth < 768 ? 'editor' : 'split',
+            setViewMode: (mode) => set({ viewMode: mode }),
 
             // Theme
             theme: themes.dark,
@@ -489,6 +493,20 @@ export const useMarkdownStore = create<MarkdownStore>()(
         }),
         {
             name: 'markdown-converter-storage',
+            partialize: (state) => ({
+                // Persist UI + theme + file selection, but not full document text.
+                // markdown lives in Dexie; persisting it duplicates MBs into localStorage
+                // and risks QuotaExceededError + stale boot overwrite.
+                activeProjectId: state.activeProjectId,
+                activeFileId: state.activeFileId,
+                documentStatus: state.documentStatus,
+                lastSavedAt: state.lastSavedAt,
+                revision: state.revision,
+                sidebarVisible: state.sidebarVisible,
+                scrollSyncEnabled: state.scrollSyncEnabled,
+                viewMode: state.viewMode,
+                theme: state.theme,
+            }),
         }
     )
 );

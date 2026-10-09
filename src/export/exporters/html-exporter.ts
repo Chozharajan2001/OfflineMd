@@ -3,6 +3,7 @@ import { markdownParser } from '../../../app/services/MarkdownParser';
 import { themeToCSS } from '../utils/theme-to-css';
 import { sanitizeHTML } from '../utils/sanitizer';
 import { highlightThemeCSS } from '../utils/highlight-theme';
+import { extractTitle, safeFilename } from '../utils/safe-filename';
 
 export class HtmlExporter implements IExporter {
     format: ExportFormat = 'html';
@@ -31,7 +32,7 @@ export class HtmlExporter implements IExporter {
         const mermaid = (await import('mermaid')).default;
         mermaid.initialize({
             startOnLoad: false,
-            securityLevel: 'loose',
+            securityLevel: 'strict',
             theme: isDarkTheme ? 'dark' : 'default',
         });
 
@@ -75,7 +76,9 @@ export class HtmlExporter implements IExporter {
             // Sanitize HTML
             const safeHtml = await sanitizeHTML(rawHtml);
             const isDarkTheme = theme.preview.background !== '#ffffff';
-            const htmlWithMermaid = await this.renderMermaidAsSvg(safeHtml, isDarkTheme);
+            const htmlWithMermaidUnsafe = await this.renderMermaidAsSvg(safeHtml, isDarkTheme);
+            // Re-sanitize after mermaid SVG injection (SVG can carry scripts/event attrs)
+            const htmlWithMermaid = await sanitizeHTML(htmlWithMermaidUnsafe);
 
             // Inline theme CSS if requested
             const styleParts: string[] = [];
@@ -104,22 +107,8 @@ export class HtmlExporter implements IExporter {
             // Generate filename with timestamp and extracted/sanitized title
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
 
-            // Extract title from first H1 heading if not in metadata
-            let baseTitle = metadata?.title || 'document';
-            if (!metadata?.title) {
-                const titleMatch = markdown.match(/^#\s+(.*)/m);
-                if (titleMatch && titleMatch[1]) {
-                    baseTitle = titleMatch[1].trim();
-                }
-            }
-
-            // Sanitize title: remove invalid filename chars and limit length
-            const safeTitle = baseTitle
-                .replace(/[\\/:*?"<>|]/g, '_')  // Remove Windows-invalid chars
-                .replace(/[^a-z0-9\s\-_]/gi, '_') // Remove other special chars
-                .replace(/\s+/g, '-')              // Spaces to dashes
-                .toLowerCase()
-                .slice(0, 50);                     // Max 50 chars
+            const baseTitle = extractTitle(markdown, metadata?.title);
+            const safeTitle = safeFilename(baseTitle);
 
             const filename = `${safeTitle}_${timestamp}${this.extension}`;
 

@@ -24,5 +24,28 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1136x825",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Markdown Converter editor with live preview"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New file",
+      "short_name": "New",
+      "description": "Open Markdown Converter with a new-file dialog",
+      "url": "/?new=file",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }

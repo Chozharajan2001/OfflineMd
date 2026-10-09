@@ -417,6 +417,9 @@ interface MarkdownStore {
     toggleScrollSyncEnabled: () => void;
     viewMode: 'editor' | 'split' | 'preview';
     setViewMode: (mode: 'editor' | 'split' | 'preview') => void;
+    /** One-shot launch intent (PWA shortcut ?new=file). Consumed by Sidebar. */
+    pendingDeepLink: string | null;
+    setPendingDeepLink: (value: string | null) => void;
 
     // Theme State
     theme: ThemeConfig;
@@ -480,6 +483,8 @@ export const useMarkdownStore = create<MarkdownStore>()(
             toggleScrollSyncEnabled: () => set((state) => ({ scrollSyncEnabled: !state.scrollSyncEnabled })),
             viewMode: typeof window !== 'undefined' && window.innerWidth < 768 ? 'editor' : 'split',
             setViewMode: (mode) => set({ viewMode: mode }),
+            pendingDeepLink: null,
+            setPendingDeepLink: (value) => set({ pendingDeepLink: value }),
 
             // Theme
             theme: themes.dark,
@@ -497,6 +502,7 @@ export const useMarkdownStore = create<MarkdownStore>()(
                 // Persist UI + theme + file selection, but not full document text.
                 // markdown lives in Dexie; persisting it duplicates MBs into localStorage
                 // and risks QuotaExceededError + stale boot overwrite.
+                // pendingDeepLink is one-shot — never persist it.
                 activeProjectId: state.activeProjectId,
                 activeFileId: state.activeFileId,
                 documentStatus: state.documentStatus,

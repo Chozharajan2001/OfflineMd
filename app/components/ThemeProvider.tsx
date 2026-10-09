@@ -124,6 +124,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.style.setProperty('--editor-bg', theme.editor.background);
         root.style.setProperty('--preview-bg', theme.preview.background);
 
+        // Installed-app chrome: keep the OS title bar in sync with the theme
+        let meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) {
+            meta = document.createElement('meta');
+            meta.setAttribute('name', 'theme-color');
+            document.head.appendChild(meta);
+        }
+        meta.setAttribute('content', theme.ui.background);
+
         // Add a smooth transition for theme variable changes (150ms)
         root.style.transition = 'background-color 150ms ease, color 150ms ease, border-color 150ms ease';
     }, [theme, isMounted]);

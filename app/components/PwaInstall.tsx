@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { MonitorDown } from 'lucide-react';
 import { Button, IconButton } from './ui';
 import { useToast } from './notifications/useToast';
@@ -10,17 +10,48 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-function isStandalone(): boolean {
-  if (typeof window === 'undefined') return false;
+function subscribeStandalone(onChange: () => void): () => void {
+  const mq = window.matchMedia('(display-mode: standalone)');
+  mq.addEventListener('change', onChange);
+  window.addEventListener('appinstalled', onChange);
+  return () => {
+    mq.removeEventListener('change', onChange);
+    window.removeEventListener('appinstalled', onChange);
+  };
+}
+
+function isStandaloneSnapshot(): boolean {
   if (window.matchMedia('(display-mode: standalone)').matches) return true;
   // iOS Safari
   if ((window.navigator as Navigator & { standalone?: boolean }).standalone === true) return true;
   return false;
 }
 
-function isIOS(): boolean {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream?: unknown }).MSStream;
+function useIsIOS(): boolean {
+  return useSyncExternalStore(
+    () => () => {},
+    () => /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as { MSStream?: unknown }).MSStream,
+    () => false
+  );
+}
+
+/** Captured install prompt. setState only runs in event callbacks, never sync in effects. */
+function useInstallPrompt(): BeforeInstallPromptEvent | null {
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  useEffect(() => {
+    const onPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferred(e as BeforeInstallPromptEvent);
+    };
+    const onInstalled = () => setDeferred(null);
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onPrompt);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+  return deferred;
 }
 
 /**
@@ -31,39 +62,20 @@ function isIOS(): boolean {
  */
 export function PwaInstallButton({ variant = 'icon' }: { variant?: 'icon' | 'full' }) {
   const toast = useToast();
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
-  const [ios, setIos] = useState(false);
+  const deferred = useInstallPrompt();
+  const installed = useSyncExternalStore(subscribeStandalone, isStandaloneSnapshot, () => false);
+  const ios = useIsIOS();
 
-  useEffect(() => {
-    setInstalled(isStandalone());
-    setIos(isIOS());
-    const onPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-    };
-    const onInstalled = () => {
-      setDeferred(null);
-      setInstalled(true);
-    };
-    window.addEventListener('beforeinstallprompt', onPrompt);
-    window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onPrompt);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
-  }, []);
+  const iosInstructions = useCallback(() => {
+    toast.info('To install: Share → Add to Home Screen. It then works offline, even with no network.', { duration: 8000 });
+  }, [toast]);
 
   const install = useCallback(async () => {
     if (!deferred) return;
     await deferred.prompt();
-    const choice = await deferred.userChoice;
-    if (choice.outcome === 'accepted') setDeferred(null);
+    await deferred.userChoice;
+    // 'appinstalled' listener clears the prompt on acceptance
   }, [deferred]);
-
-  const iosInstructions = useCallback(() => {
-    toast.info('To install: Share → Add to Home Screen. It then works offline.', { duration: 8000 });
-  }, [toast]);
 
   if (installed) return null;
 
@@ -105,19 +117,18 @@ export function PwaInstallButton({ variant = 'icon' }: { variant?: 'icon' | 'ful
 
 /** Small offline pill: proves at a glance the app survives no-network. */
 export function OfflineBadge() {
-  const [online, setOnline] = useState(true);
-
-  useEffect(() => {
-    setOnline(navigator.onLine);
-    const goOff = () => setOnline(false);
-    const goOn = () => setOnline(true);
-    window.addEventListener('offline', goOff);
-    window.addEventListener('online', goOn);
-    return () => {
-      window.removeEventListener('offline', goOff);
-      window.removeEventListener('online', goOn);
-    };
-  }, []);
+  const online = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener('offline', onChange);
+      window.addEventListener('online', onChange);
+      return () => {
+        window.removeEventListener('offline', onChange);
+        window.removeEventListener('online', onChange);
+      };
+    },
+    () => navigator.onLine,
+    () => true
+  );
 
   if (online) return null;
   return (

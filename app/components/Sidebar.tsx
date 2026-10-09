@@ -31,6 +31,8 @@ export function Sidebar() {
         setSaved,
         sidebarVisible,
         toggleSidebarVisible,
+        pendingDeepLink,
+        setPendingDeepLink,
     } = useMarkdownStore();
     const toast = useToast();
 
@@ -85,6 +87,17 @@ export function Sidebar() {
             }
         })();
     }, [setActiveProject, toast]);
+
+    // Consume one-shot launch intents (PWA shortcut ?new=file). Waits for a
+    // project deterministically instead of racing the bootstrap with a timeout.
+    useEffect(() => {
+        if (pendingDeepLink === 'new-file' && activeProjectId) {
+            setPendingDeepLink(null);
+            setPendingNodeType('file');
+            setPendingParentId(null);
+            setOpenCreateNode(true);
+        }
+    }, [pendingDeepLink, activeProjectId, setPendingDeepLink]);
 
     // Dialog states
     const [openCreateProject, setOpenCreateProject] = useState(false);

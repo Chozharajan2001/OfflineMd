@@ -1,8 +1,26 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useMarkdownStore } from './store';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { ResizableLayout } from './components/ResizableLayout';
+
+/**
+ * Handles launch URLs: app shortcuts (?new=file) and shared links.
+ * Writes a one-shot intent into the store; Sidebar consumes it once a
+ * project is active. Store-driven (not event + timeout), so no race between
+ * the default-project bootstrap and the dialog is possible.
+ */
+function DeepLinkHandler() {
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('new') !== 'file') return;
+    window.history.replaceState(null, '', '/');
+    useMarkdownStore.getState().setPendingDeepLink('new-file');
+  }, []);
+  return null;
+}
 
 export default function Home() {
   return (
@@ -10,6 +28,7 @@ export default function Home() {
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[200] focus:p-2 focus:bg-[var(--background)] focus:text-[var(--foreground)]">
         Skip to content
       </a>
+      <DeepLinkHandler />
       <Header />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />

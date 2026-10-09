@@ -86,9 +86,11 @@ We can destroy a document with one click today. The competitor cannot.
   `layout.tsx`. Eager, not lazy — Mermaid-style lazying is still open (see M6 chunk work).
   Their bundle loads MathJax (`tex-mml-chtml`). KaTeX is the lighter choice; lazy-load it the
   same way Mermaid now is.
-- [ ] **Export as PNG image** (gap A9) — `ExportFormat` is `'md' | 'txt' | 'html' | 'pdf' |
-  'docx' | 'pptx'`. Add a `png-exporter.ts` (render the preview to canvas).
-- [ ] **Import from GitHub / URL** (gap A10) — we accept only local `.md`/`.txt`.
+- [x] **Export as PNG image** (gap A9) — DONE 2026-10-09: `png-exporter.ts` (off-screen themed
+  snapshot via `html-to-image`, 2x, lazy), `ExportFormat` + orchestrator + menu + theme gating.
+- [x] **Import from GitHub / URL** (gap A10) — DONE 2026-10-09: Import-from-URL dialog in `Header.tsx`
+  (https-only, 15s timeout, content-type guard, 2MB cap, reuses save-confirm flow; works with
+  GitHub raw links).
 - [ ] **In-app table of contents** (gap A14) — plus make the export honour it:
   `includeTableOfContents`, `syntaxHighlight` and `headerFooter` are in `src/export/types.ts`
   and the dialog defaults, but **no exporter reads them**. Either implement or delete them

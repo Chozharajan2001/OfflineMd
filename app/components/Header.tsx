@@ -46,6 +46,8 @@ export function Header() {
     const [optionsOpen, setOptionsOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState<number | undefined>(undefined);
+    // Run token: cancelling bumps it so a late-resolving export is discarded
+    const exportRunId = React.useRef(0);
 
     // Dialog states
     const [openSaveAsDialog, setOpenSaveAsDialog] = useState(false);
@@ -53,6 +55,7 @@ export function Header() {
     const [openBackupConfirm, setOpenBackupConfirm] = useState(false);
     const [pendingBackupFile, setPendingBackupFile] = useState<File | null>(null);
     const [openUrlImport, setOpenUrlImport] = useState(false);
+    const [settingsTab, setSettingsTab] = useState<'appearance' | 'workspace'>('appearance');
     const [pendingImportContent, setPendingImportContent] = useState<string | null>(null);
     const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
     const [isMacPlatform, setIsMacPlatform] = useState(false);
@@ -266,6 +269,7 @@ export function Header() {
         // md/txt have no options — export directly instead of empty dialog (M-12)
         if (format === 'md' || format === 'txt') {
             void (async () => {
+                const runId = ++exportRunId.current;
                 setExporting(true);
                 setExportProgress(0);
                 try {
@@ -286,16 +290,22 @@ export function Header() {
                             syntaxHighlight: false,
                         },
                         metadata: await buildExportMetadata(),
-                        onProgress: (p: number) => setExportProgress(p),
+                        onProgress: (p: number) => {
+                            if (exportRunId.current === runId) setExportProgress(p);
+                        },
                     };
                     const result = await ExportOrchestrator.export(format, input);
+                    if (exportRunId.current !== runId) return;
                     await triggerDownload(result.blob, result.filename);
                     toast.success(`Exported ${result.filename}`);
                 } catch (error) {
+                    if (exportRunId.current !== runId) return;
                     toast.error(error instanceof Error ? error.message : 'Export failed');
                 } finally {
-                    setExporting(false);
-                    setExportProgress(undefined);
+                    if (exportRunId.current === runId) {
+                        setExporting(false);
+                        setExportProgress(undefined);
+                    }
                 }
             })();
             return;
@@ -426,7 +436,9 @@ export function Header() {
                     open={optionsOpen}
                     onOpenChange={setOptionsOpen}
                     format={exportFormat}
+                    markdown={markdown}
                     onExport={async (format, options) => {
+                        const runId = ++exportRunId.current;
                         setExporting(true);
                         setExportProgress(0);
                         try {
@@ -439,19 +451,24 @@ export function Header() {
                                 options,
                                 metadata: await buildExportMetadata(),
                                 onProgress: (progress: number) => {
-                                    setExportProgress(progress);
+                                    if (exportRunId.current === runId) setExportProgress(progress);
                                 },
                             };
                             const result = await ExportOrchestrator.export(format, input);
+                            // A cancelled run still resolves in the background — discard it
+                            if (exportRunId.current !== runId) return;
                             await triggerDownload(result.blob, result.filename);
                             toast.success(`Exported ${result.filename}`);
                         } catch (error) {
+                            if (exportRunId.current !== runId) return;
                             const message = error instanceof Error ? error.message : 'Export failed';
                             toast.error(message);
                             throw error;
                         } finally {
-                            setExporting(false);
-                            setExportProgress(undefined);
+                            if (exportRunId.current === runId) {
+                                setExporting(false);
+                                setExportProgress(undefined);
+                            }
                         }
                     }}
                 />
@@ -460,6 +477,15 @@ export function Header() {
                     visible={exporting}
                     progress={exportProgress}
                     message={exportProgress ? `Exporting... ${Math.round(exportProgress)}%` : 'Exporting...'}
+                    onCancel={() => {
+                        // UI-level cancel: hides progress and discards the result.
+                        // Generation itself isn't abortable mid-flight (pdf-lib/docx
+                        // offer no cancellation hooks), so it finishes silently.
+                        exportRunId.current += 1;
+                        setExporting(false);
+                        setExportProgress(undefined);
+                        toast.info('Export cancelled');
+                    }}
                 />
 
                 <div className="hidden min-[480px]:flex gap-1 border-l border-[var(--header-border)] pl-2 ml-1" role="toolbar" aria-label="View mode">
@@ -563,26 +589,51 @@ export function Header() {
                     </Dialog.Trigger>
                     <Dialog.Portal>
                         <Dialog.Overlay className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm" />
-                        <Dialog.Content className="fixed top-1/2 left-1/2 z-[110] transform -translate-x-1/2 -translate-y-1/2 bg-[var(--background)] border border-[var(--header-border)] text-[var(--dialog-fg)] p-6 rounded-lg shadow-xl max-w-md w-full">
-                            <Dialog.Title className="text-lg font-semibold mb-4">Theme Settings</Dialog.Title>
+                        <Dialog.Content className="fixed top-1/2 left-1/2 z-[110] transform -translate-x-1/2 -translate-y-1/2 bg-[var(--background)] border border-[var(--header-border)] text-[var(--dialog-fg)] p-6 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-auto">
+                            <Dialog.Title className="text-lg font-semibold mb-3">Settings</Dialog.Title>
 
+                            <div role="tablist" aria-label="Settings sections" className="flex gap-1 mb-4 rounded bg-[var(--button-secondary-bg)] p-1">
+                                {(['appearance', 'workspace'] as const).map((tab) => (
+                                    <button
+                                        key={tab}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={settingsTab === tab}
+                                        onClick={() => setSettingsTab(tab)}
+                                        className={`flex-1 min-h-[40px] rounded px-3 text-sm font-medium capitalize transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${settingsTab === tab ? 'bg-[var(--dialog-bg)] text-[var(--dialog-fg)] shadow' : 'text-[var(--sidebar-muted)] hover:text-[var(--dialog-fg)]'}`}
+                                    >
+                                        {tab}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {settingsTab === 'appearance' && (
                             <div className="space-y-6">
                                 <div>
-                                    <h3 className="font-medium text-[var(--sidebar-muted)] text-sm uppercase tracking-wider mb-2">Presets</h3>
-                                    <select
-                                        className="w-full bg-[var(--sidebar-input-bg)] border border-[var(--sidebar-border)] rounded px-2 py-2 text-[var(--sidebar-fg)]"
-                                        onChange={(e) => applyPreset(e.target.value)}
-                                        value={Object.keys(themes).find((key) => themes[key].name === theme.name) || ''}
-                                    >
-                                        <option value="" disabled>
-                                            Select a Preset...
-                                        </option>
-                                        {Object.keys(themes).map((key) => (
-                                            <option key={key} value={key}>
-                                                {themes[key].name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <h3 className="font-medium text-[var(--sidebar-muted)] text-sm uppercase tracking-wider mb-2">Theme preset</h3>
+                                    <div role="radiogroup" aria-label="Theme preset" className="max-h-56 overflow-auto rounded border border-[var(--sidebar-border)] divide-y divide-[var(--sidebar-border)]">
+                                        {Object.keys(themes).map((key) => {
+                                            const preset = themes[key];
+                                            const selected = preset.name === theme.name;
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    role="radio"
+                                                    aria-checked={selected}
+                                                    onClick={() => applyPreset(key)}
+                                                    className={`flex w-full items-center gap-3 px-3 min-h-[44px] text-left text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--accent)] ${selected ? 'bg-[var(--sidebar-hover)] font-medium' : 'hover:bg-[var(--sidebar-hover)]'}`}
+                                                >
+                                                    <span className="flex -space-x-1" aria-hidden="true">
+                                                        <span className="h-4 w-4 rounded-full border border-black/30" style={{ backgroundColor: preset.ui.background }} />
+                                                        <span className="h-4 w-4 rounded-full border border-black/30" style={{ backgroundColor: preset.ui.accent }} />
+                                                    </span>
+                                                    <span className="flex-1">{preset.name}</span>
+                                                    {selected && <span aria-hidden="true">✓</span>}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
 
                                 <div>
@@ -613,9 +664,13 @@ export function Header() {
                                 >
                                     Reset to Defaults
                                 </Button>
+                            </div>
+                            )}
 
-                                <div>
-                                    <h3 className="font-medium text-[var(--sidebar-muted)] text-sm uppercase tracking-wider mb-2">Workspace backup</h3>
+                            {settingsTab === 'workspace' && (
+                            <div className="space-y-4">
+                                <div className="rounded-lg border border-red-500/40 p-4">
+                                    <h3 className="font-medium text-sm uppercase tracking-wider mb-2 text-red-500">Danger zone</h3>
                                     <div className="flex gap-2">
                                         <Button
                                             variant="secondary"
@@ -657,6 +712,7 @@ export function Header() {
                                     </p>
                                 </div>
                             </div>
+                            )}
                             <Dialog.Close asChild>
                                 <button
                                     type="button"

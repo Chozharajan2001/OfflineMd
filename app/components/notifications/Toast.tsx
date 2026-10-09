@@ -23,22 +23,34 @@ export interface ToastProps {
 export function Toast({ toast, onClose }: ToastProps) {
   const duration = toast.duration ?? getDefaultDuration(toast.type);
   const [paused, setPaused] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const remaining = useRef(duration);
   const startedAt = useRef(0);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const dismiss = () => {
+    setLeaving(true);
+    closeTimer.current = setTimeout(() => onClose(toast.id), 160);
+  };
 
   // Auto-dismiss after duration, pausable on hover/focus
   useEffect(() => {
     if (paused) return;
     startedAt.current = Date.now();
     const timer = setTimeout(() => {
-      onClose(toast.id);
+      dismiss();
     }, remaining.current);
 
     return () => {
       clearTimeout(timer);
       remaining.current -= Date.now() - startedAt.current;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast.id, paused, onClose]);
+
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
 
   // Icon and color based on type — surfaces come from the theme, only the
   // semantic bar + icon carry the status color (0.1 elevation scale)
@@ -88,7 +100,7 @@ export function Toast({ toast, onClose }: ToastProps) {
   return (
     <div
       role="status"
-      className="relative flex items-start gap-3 p-4 rounded-lg border border-[var(--dialog-border)] bg-[var(--surface-2)] text-[var(--dialog-fg)] shadow-lg border-l-4 animate-slide-in-right"
+      className={`relative flex items-start gap-3 p-4 rounded-lg border border-[var(--dialog-border)] bg-[var(--surface-2)] text-[var(--dialog-fg)] shadow-lg border-l-4 ${leaving ? 'animate-toast-out' : 'animate-slide-in-right'}`}
       style={{ borderLeftColor: styles.bar }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -106,7 +118,7 @@ export function Toast({ toast, onClose }: ToastProps) {
         <button
           onClick={() => {
             toast.onAction?.();
-            onClose(toast.id);
+            dismiss();
           }}
           className="shrink-0 px-2 py-1 text-xs font-semibold rounded transition-colors bg-[var(--button-primary-bg)] text-[var(--button-fg)] hover:bg-[var(--button-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
         >
@@ -116,7 +128,7 @@ export function Toast({ toast, onClose }: ToastProps) {
 
       {/* Close button */}
       <button
-        onClick={() => onClose(toast.id)}
+        onClick={dismiss}
         className="absolute top-2 right-2 p-1 hover:bg-[var(--sidebar-hover)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
         aria-label="Dismiss notification"
       >

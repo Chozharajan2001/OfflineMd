@@ -2,6 +2,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useState, useEffect } from 'react';
 import type { ExportFormat, ExportOptions } from '../types';
 import { Button } from '../../../app/components/ui';
+import { extractTitle, safeFilename } from '../utils/safe-filename';
 
 const defaultOptions: ExportOptions = {
     includeTheme: true,
@@ -20,13 +21,26 @@ interface ExportOptionsDialogProps {
     onOpenChange: (open: boolean) => void;
     format: ExportFormat | null;
     onExport: (format: ExportFormat, options: ExportOptions) => Promise<void> | void;
+    /** Raw markdown for the filename preview. Omit to hide the summary. */
+    markdown?: string;
 }
+
+const EXTENSIONS: Record<ExportFormat, string> = {
+    md: '.md',
+    txt: '.txt',
+    html: '.html',
+    pdf: '.pdf',
+    docx: '.docx',
+    pptx: '.pptx',
+    png: '.png',
+};
 
 export function ExportOptionsDialog({
     open,
     onOpenChange,
     format,
     onExport,
+    markdown,
 }: ExportOptionsDialogProps) {
     // Hooks are always called, regardless of props
     const [options, setOptions] = useState<ExportOptions>(defaultOptions);
@@ -116,7 +130,20 @@ export function ExportOptionsDialog({
                         </div>
                     )}
 
-                    <div className="space-y-2 text-sm">
+                    <div className="space-y-3 text-sm">
+                        {/* Fixed skeleton: Output summary first, then grouped options.
+                            Sections keep stable order so the dialog never shape-shifts. */}
+                        <section aria-label="Output">
+                            <h4 className="font-medium text-[var(--sidebar-muted)] text-xs uppercase tracking-wider mb-1">Output</h4>
+                            <p className="truncate text-[var(--sidebar-fg)]" title="Resulting file name">
+                                {markdown ? `${safeFilename(extractTitle(markdown))}_…${EXTENSIONS[format]}` : `${format.toUpperCase()} document`}
+                                {options.includeTheme && supportsTheme ? ' · themed' : ''}
+                            </p>
+                        </section>
+
+                        {(supportsTheme || supportsImages || supportsToc) && (
+                        <section aria-label="Style" className="space-y-2">
+                            <h4 className="font-medium text-[var(--sidebar-muted)] text-xs uppercase tracking-wider">Style</h4>
                         {/* Include Theme */}
                         {supportsTheme && (
                             <label className="flex items-center gap-2">
@@ -153,9 +180,12 @@ export function ExportOptionsDialog({
                                 <span>Include table of contents</span>
                             </label>
                         )}
+                        </section>
+                        )}
 
                         {supportsPageLayout && (
-                            <>
+                            <section aria-label="Page" className="space-y-2">
+                                <h4 className="font-medium text-[var(--sidebar-muted)] text-xs uppercase tracking-wider">Page</h4>
                                 {/* Page Size */}
                                 <label className="flex items-center gap-2">
                                     <span>Page size</span>
@@ -182,7 +212,7 @@ export function ExportOptionsDialog({
                                         <option value="landscape">Landscape</option>
                                     </select>
                                 </label>
-                            </>
+                            </section>
                         )}
                     </div>
 

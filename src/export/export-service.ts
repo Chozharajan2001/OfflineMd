@@ -31,6 +31,8 @@ export class ExportOrchestrator {
           return new (await import('./exporters/docx-exporter')).DocxExporter();
         case 'pptx':
           return new (await import('./exporters/pptx-exporter')).PptxExporter();
+        case 'png':
+          return new (await import('./exporters/png-exporter')).PngExporter();
         default:
           throw new Error('Unsupported export format: ' + format);
       }

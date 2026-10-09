@@ -88,7 +88,7 @@ export function ExportOptionsDialog({
     // If format is not provided, render nothing (after hooks)
     if (!format) return null;
 
-    const supportsTheme = format === 'html' || format === 'pdf' || format === 'docx' || format === 'pptx';
+    const supportsTheme = format === 'html' || format === 'pdf' || format === 'docx' || format === 'pptx' || format === 'png';
     const supportsPageLayout = format === 'pdf';
     const supportsImages = format === 'html' || format === 'pdf';
 

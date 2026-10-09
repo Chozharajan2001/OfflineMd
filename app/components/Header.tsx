@@ -49,6 +49,7 @@ export function Header() {
     const [openImportConfirm, setOpenImportConfirm] = useState(false);
     const [openBackupConfirm, setOpenBackupConfirm] = useState(false);
     const [pendingBackupFile, setPendingBackupFile] = useState<File | null>(null);
+    const [openUrlImport, setOpenUrlImport] = useState(false);
     const [pendingImportContent, setPendingImportContent] = useState<string | null>(null);
     const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
     const [isMacPlatform, setIsMacPlatform] = useState(false);
@@ -212,6 +213,41 @@ export function Header() {
         }
     };
 
+    const handleUrlImportSubmit = async (url: string) => {
+        const trimmed = url.trim();
+        let parsed: URL;
+        try {
+            parsed = new URL(trimmed);
+        } catch {
+            throw new Error('Invalid URL.');
+        }
+        if (parsed.protocol !== 'https:') throw new Error('Only https URLs are allowed.');
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        try {
+            const res = await fetch(parsed.toString(), { signal: controller.signal });
+            if (!res.ok) throw new Error(`Fetch failed (${res.status}).`);
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType && !/text|markdown|plain|octet-stream|github/.test(contentType)) {
+                throw new Error(`Refusing to import ${contentType}.`);
+            }
+            const text = await res.text();
+            if (text.length > MAX_IMPORT_BYTES) throw new Error('Content too large (max 2 MB).');
+            setMarkdownFromUser(text);
+            if (activeProjectId) {
+                setPendingImportContent(text);
+                // Synthesize a File-like name from the URL path for the save flow
+                const base = parsed.pathname.split('/').filter(Boolean).pop() || 'imported.md';
+                setPendingImportFile(new File([text], /\.m(d|txt)$/i.test(base) ? base : `${base}.md`, { type: 'text/markdown' }));
+                setOpenImportConfirm(true);
+            } else {
+                setActiveFile(null);
+                toast.info('File imported (not saved - select a project to save)');
+            }
+        } finally {
+            clearTimeout(timeout);
+        }
+    };
     const buildExportMetadata = async (): Promise<{ title?: string }> => {
         if (activeFileId) {
             const file = await db.nodes.get(activeFileId);
@@ -327,6 +363,15 @@ export function Header() {
                         <Upload className="w-5 h-5" />
                     </label>
                     <input id="import-file-input" type="file" accept=".md,.txt" onChange={handleImport} className="sr-only" />
+                    <button
+                        type="button"
+                        onClick={() => setOpenUrlImport(true)}
+                        className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors"
+                        title="Import from URL"
+                        aria-label="Import markdown from URL"
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
+                    </button>
                 </div>
 
                 <ExportMenu
@@ -593,6 +638,17 @@ export function Header() {
                     </Dialog.Portal>
                 </Dialog.Root>
             </div>
+
+            <InputDialog
+                open={openUrlImport}
+                onOpenChange={setOpenUrlImport}
+                title="Import from URL"
+                description="Paste an https link to a raw markdown file (e.g. GitHub raw)."
+                placeholder="https://raw.githubusercontent.com/…/README.md"
+                submitText="Import"
+                validate={(v) => (!v.trim() ? 'URL is required.' : null)}
+                onSubmit={handleUrlImportSubmit}
+            />
 
             <InputDialog
                 open={openSaveAsDialog}

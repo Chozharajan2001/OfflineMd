@@ -16,6 +16,7 @@ export function ExportMenu({ onSelect, shortcutLabel }: ExportMenuProps) {
         { format: "pdf", label: "PDF (.pdf)", icon: <FileStack size={14} /> },
         { format: "docx", label: "DOCX (.docx)", icon: <FileSymlink size={14} /> },
         { format: "pptx", label: "PPTX (.pptx)", icon: <FileSymlink size={14} /> },
+        { format: "png", label: "PNG (.png)", icon: <File size={14} /> },
     ];
 
     return (

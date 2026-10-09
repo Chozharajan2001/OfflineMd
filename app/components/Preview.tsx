@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { useMarkdownStore } from '../store';
 import { markdownParser } from '../services/MarkdownParser';
-import { safeFontFamily, safeHex } from '../../src/export/utils/theme-validation';
+import { safeFontFamily, safeHex, accentTextFor } from '../../src/export/utils/theme-validation';
 import { getFrontMatter } from '../../src/export/utils/front-matter';
 
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
@@ -160,6 +160,7 @@ export function Preview() {
 
     // Inline styles for rich typography
     const accent = safeHex(theme.ui.accent);
+    const accentText = accentTextFor(theme.preview.background, theme.ui.accent, theme.preview.foreground);
     const border = safeHex(theme.ui.border);
     const uiBg = safeHex(theme.ui.background);
     const uiFg = safeHex(theme.ui.foreground);
@@ -176,16 +177,16 @@ export function Preview() {
 
         .preview-content p { margin-top: 0; margin-bottom: 1.25em; line-height: 1.75; }
 
-        .preview-content a { color: ${accent}; text-decoration: underline; text-underline-offset: 2px; }
+        .preview-content a { color: ${accentText}; text-decoration: underline; text-underline-offset: 2px; }
         .preview-content a:hover { text-decoration: none; }
 
-        .preview-content strong { font-weight: 600; color: ${accent}; }
+        .preview-content strong { font-weight: 600; color: ${accentText}; }
         .preview-content em { font-style: italic; }
 
         .preview-content ul, .preview-content ol { margin-top: 0; margin-bottom: 1.25em; padding-left: 2em; }
         .preview-content li { margin-top: 0.5em; margin-bottom: 0.5em; line-height: 1.75; }
-        .preview-content ul li::marker { color: ${accent}; }
-        .preview-content ol li::marker { color: ${accent}; font-weight: 500; }
+        .preview-content ul li::marker { color: ${accentText}; }
+        .preview-content ol li::marker { color: ${accentText}; font-weight: 500; }
 
         .preview-content ul ul, .preview-content ol ol,
         .preview-content ul ol, .preview-content ol ul { margin-top: 0.5em; margin-bottom: 0.5em; }
@@ -213,7 +214,7 @@ export function Preview() {
             background: ${uiBg}40;
             padding: 0.2em 0.4em;
             border-radius: 4px;
-            color: ${accent};
+            color: ${accentText};
         }
 
         .preview-content pre {

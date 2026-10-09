@@ -1,5 +1,5 @@
 import type { ThemeTokens } from '../types';
-import { safeFontFamily, safeFontSize, safeHex } from './theme-validation';
+import { safeFontFamily, safeFontSize, safeHex, accentTextFor } from './theme-validation';
 
 export function themeToCSS(theme: ThemeTokens): string {
     const ui = {
@@ -27,6 +27,7 @@ export function themeToCSS(theme: ThemeTokens): string {
   --foreground: ${ui.foreground};
   --border: ${ui.border};
   --accent: ${ui.accent};
+  --accent-text: ${accentTextFor(preview.background, ui.accent, preview.foreground)};
 
   /* Editor level */
   --editor-bg: ${editor.background};
@@ -118,7 +119,7 @@ export function themeToCSS(theme: ThemeTokens): string {
 
 /* Links */
 .preview-content a {
-  color: ${ui.accent};
+  color: var(--accent-text);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -129,7 +130,7 @@ export function themeToCSS(theme: ThemeTokens): string {
 /* Strong and Emphasis */
 .preview-content strong {
   font-weight: 600;
-  color: ${ui.accent};
+  color: var(--accent-text);
 }
 
 .preview-content em {
@@ -156,11 +157,11 @@ export function themeToCSS(theme: ThemeTokens): string {
 }
 
 .preview-content ul li::marker {
-  color: ${ui.accent};
+  color: var(--accent-text);
 }
 
 .preview-content ol li::marker {
-  color: ${ui.accent};
+  color: var(--accent-text);
   font-weight: 500;
 }
 
@@ -203,7 +204,7 @@ export function themeToCSS(theme: ThemeTokens): string {
   background: ${ui.background}40;
   padding: 0.2em 0.4em;
   border-radius: 4px;
-  color: ${ui.accent};
+  color: var(--accent-text);
 }
 
 /* Code - Blocks */

@@ -36,7 +36,7 @@ export function ResizableLayout() {
                     <Editor />
                 </Panel>
 
-                <Separator className="w-2 min-w-[8px] bg-[var(--sidebar-border)] hover:bg-[var(--accent)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]" />
+                <Separator className="w-2 min-w-[8px] bg-[var(--sidebar-border)] hover:bg-[var(--accent)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] relative before:content-[''] before:absolute before:inset-y-0 before:-left-2 before:-right-2" />
 
                 <Panel defaultSize={50} minSize={20}>
                     <Preview />

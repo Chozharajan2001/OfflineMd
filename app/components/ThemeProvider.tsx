@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useMarkdownStore } from '../store';
 import { useMonaco } from '@monaco-editor/react';
+import { accentTextFor } from '../../src/export/utils/theme-validation';
 
 // WCAG relative luminance. Below 0.5 the surface is dark and needs light-on-dark treatment.
 const getLuminance = (hex: string): number => {
@@ -45,6 +46,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.style.setProperty('--foreground', theme.ui.foreground);
         root.style.setProperty('--border', theme.ui.border);
         root.style.setProperty('--accent', theme.ui.accent);
+        root.style.setProperty('--accent-text', accentTextFor(theme.preview.background, theme.ui.accent, theme.preview.foreground));
 
         // Shared state + scrim tokens consumed by the utilities in tailwind's theme
         root.style.setProperty('--ui-hover-bg', state(0.08));

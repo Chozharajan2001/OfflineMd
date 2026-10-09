@@ -336,7 +336,7 @@ export function Header() {
                 >
                     <Menu className="w-5 h-5" />
                 </button>
-                <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate">Markdown Converter</h1>
+                <p className="text-lg sm:text-xl font-bold tracking-tight truncate">Markdown Converter</p>
             </div>
             <div className="flex gap-1 sm:gap-2 items-center shrink-0">
                 <div

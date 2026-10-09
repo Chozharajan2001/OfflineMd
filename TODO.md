@@ -114,11 +114,15 @@ We can destroy a document with one click today. The competitor cannot.
 
 `axe-core` reported 6 violations; 1 is fixed (viewport). Remaining, roughly in order of harm:
 
-- [ ] **Touch targets to 44 px** (M-4) — measured 36 px header buttons, 14 px sidebar `+`,
-  14 px Explorer toolbar buttons, 26 px tree rows, 32 px dialog buttons, 8 px panel separator.
-- [ ] **Contrast** (M-3) — `--sidebar-muted #6b7280` = 4.34:1 (fails AA for the file list and
-  save status); `--sidebar-icon #9ca3af` ≈ 2.5:1 for icons; `--accent` as text = 3.85:1.
-  Add `--muted-text` and `--accent-text` tokens per theme.
+- [x] **Touch targets to 44 px** (M-4) — DONE 2026-10-09 with a documented split: header
+  controls 44px and dialog buttons 40px via `globals.css`; panel separator keeps its 8px visual
+  with a wider invisible hit area (`ResizableLayout.tsx`); dense tree/menu rows set to 36px
+  (`aside`/`[role=menu]` rules) — below 44 deliberately for list density.
+- [x] **Contrast** (M-3) — DONE 2026-10-09: `--sidebar-muted`/`--sidebar-icon` raised to `#a1a1aa`
+  (dark) / `#52525b` (light) in `ThemeProvider.tsx`; new `--accent-text` token
+  (`accentTextFor()` in `theme-validation.ts`: keeps accent when ≥4.5:1, else mixes toward
+  foreground) applied to links/strong/markers/inline-code in `Preview.tsx` and `theme-to-css.ts`
+  (large headings keep `--accent`, which passes 3:1).
 - [ ] **Landmarks and skip link** (M-7) — no `<main>`, `<nav>` or `<aside>`; 5 regions orphaned;
   no skip link. `app/page.tsx` and `Sidebar.tsx`.
 - [ ] **Keyboard access to scroll regions** (M-7) — the file tree and preview scroll but cannot
@@ -128,7 +132,8 @@ We can destroy a document with one click today. The competitor cannot.
 - [ ] **Dialog form semantics** (M-10) — inputs are labelled by placeholder only; errors have no
   `role="alert"`, no `aria-invalid`, no `aria-describedby`, and use `text-red-400` (≈3.0:1 on
   white). `InputDialog.tsx`, `ConfirmDialog.tsx`, `ExportOptionsDialog.tsx`.
-- [ ] **One `<h1>` per view** (M-9) — the brand `h1` and the preview document's `h1` coexist.
+- [x] **One `<h1>` per view** (M-9) — DONE 2026-10-09: brand heading in `Header.tsx` demoted to
+  `<p>` (same styling), leaving the document's own `<h1>` as the single one.
 - [ ] **`prefers-reduced-motion`** (M-15) — zero occurrences in the shipped stylesheet.
 - [ ] **Toast timing** (m-20/m-21) — auto-dismiss cannot be paused on hover/focus; no exit
   animation; container has `aria-label` on a role-less `div` (axe `aria-prohibited-attr`);

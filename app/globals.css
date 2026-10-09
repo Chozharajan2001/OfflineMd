@@ -98,6 +98,29 @@ body {
     border-radius: 2px;
 }
 
+/* M4 touch targets: header controls hit 44px; dialogs 40px; dense tree/menu rows 36px.
+   Tree rows stay below 44px deliberately for density (documented in TODO.md). */
+header button,
+header label {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+[role="dialog"] button {
+    min-height: 40px;
+}
+
+[role="menu"] [role="menuitem"] {
+    min-height: 36px;
+}
+
+aside button {
+    min-height: 36px;
+}
+
 /* Ensure buttons and interactive elements have visible focus */
 button:focus-visible,
 input:focus-visible,

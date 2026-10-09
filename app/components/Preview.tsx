@@ -7,6 +7,7 @@ import { useMarkdownStore } from '../store';
 import { markdownParser } from '../services/MarkdownParser';
 import { safeFontFamily, safeHex, accentTextFor } from '../../src/export/utils/theme-validation';
 import { getFrontMatter } from '../../src/export/utils/front-matter';
+import { copyTextToClipboard } from '../../src/export/utils/clipboard';
 import { useToast } from './notifications/useToast';
 
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
@@ -410,9 +411,9 @@ export function Preview() {
                 <button
                     type="button"
                     onClick={() => {
-                        void navigator.clipboard.writeText(markdown).then(
+                        void copyTextToClipboard(markdown).then(
                             () => toast.success('Markdown copied!'),
-                            () => toast.error('Copy failed')
+                            () => toast.error('Copy failed — select the text manually')
                         );
                     }}
                     title="Copy markdown"

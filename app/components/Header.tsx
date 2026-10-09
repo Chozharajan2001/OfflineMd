@@ -16,6 +16,7 @@ import { buildWorkspaceBackup, restoreWorkspaceBackup } from '../utils/backup';
 import { ConfirmDialog, InputDialog } from './dialogs';
 import { Button, IconButton } from './ui';
 import { PwaInstallButton, OfflineBadge } from './PwaInstall';
+import { copyTextToClipboard } from '../../src/export/utils/clipboard';
 import { useToast } from './notifications/useToast';
 
 export function Header() {
@@ -546,9 +547,9 @@ export function Header() {
                             </DropdownMenu.Item>
                             <DropdownMenu.Item
                                 onSelect={() => {
-                                    void navigator.clipboard.writeText(markdown).then(
+                                    void copyTextToClipboard(markdown).then(
                                         () => toast.success('Markdown copied!'),
-                                        () => toast.error('Copy failed')
+                                        () => toast.error('Copy failed — select the text manually')
                                     );
                                 }}
                                 className="flex items-center gap-2 p-1 min-h-[36px] hover:bg-[var(--dropdown-hover)] cursor-pointer rounded text-[var(--dropdown-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"

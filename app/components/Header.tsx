@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Settings, Save, Upload, Menu, ArrowUpDown, Columns2, SquarePen, Eye } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { Settings, Save, Upload, Menu, ArrowUpDown, Columns2, SquarePen, Eye, ChevronDown, MoreVertical, Copy, Link2, Download } from 'lucide-react';
 import { useMarkdownStore, themes } from '../store';
 import { ExportOrchestrator } from '../../src/export/export-service';
 import type { ExportFormat, ThemeTokens } from '../../src/export/types';
@@ -41,6 +42,7 @@ export function Header() {
     const toast = useToast();
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [exportFormat, setExportFormat] = useState<ExportFormat | null>(null);
+    const [lastFormat, setLastFormat] = useState<ExportFormat>('pdf');
     const [optionsOpen, setOptionsOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState<number | undefined>(undefined);
@@ -249,7 +251,7 @@ export function Header() {
             clearTimeout(timeout);
         }
     };
-    const buildExportMetadata = async (): Promise<{ title?: string }> => {
+    const buildExportMetadata = useCallback(async (): Promise<{ title?: string }> => {
         if (activeFileId) {
             const file = await db.nodes.get(activeFileId);
             if (file?.name) {
@@ -258,7 +260,54 @@ export function Header() {
         }
         const heading = markdown.match(/^#\s+(.*)/m)?.[1]?.trim();
         return { title: heading || 'document' };
-    };
+    }, [activeFileId, markdown]);
+
+    const startExport = useCallback((format: ExportFormat) => {
+        // md/txt have no options — export directly instead of empty dialog (M-12)
+        if (format === 'md' || format === 'txt') {
+            void (async () => {
+                setExporting(true);
+                setExportProgress(0);
+                try {
+                    const { markdown, theme } = useMarkdownStore.getState();
+                    const input = {
+                        markdown,
+                        ast: undefined,
+                        theme: theme as ThemeTokens,
+                        options: {
+                            includeTheme: false,
+                            includeTableOfContents: false,
+                            pageSize: 'A4' as const,
+                            orientation: 'portrait' as const,
+                            margins: { top: 10, right: 10, bottom: 10, left: 10 },
+                            fontSize: 12,
+                            headerFooter: false,
+                            embedImages: false,
+                            syntaxHighlight: false,
+                        },
+                        metadata: await buildExportMetadata(),
+                        onProgress: (p: number) => setExportProgress(p),
+                    };
+                    const result = await ExportOrchestrator.export(format, input);
+                    await triggerDownload(result.blob, result.filename);
+                    toast.success(`Exported ${result.filename}`);
+                } catch (error) {
+                    toast.error(error instanceof Error ? error.message : 'Export failed');
+                } finally {
+                    setExporting(false);
+                    setExportProgress(undefined);
+                }
+            })();
+            return;
+        }
+        setExportFormat(format);
+        setOptionsOpen(true);
+    }, [toast, buildExportMetadata]);
+
+    const handleFormatSelect = useCallback((format: ExportFormat) => {
+        setLastFormat(format);
+        startExport(format);
+    }, [startExport]);
 
     useEffect(() => {
         setIsMacPlatform(/Mac|iPhone|iPad|iPod/i.test(navigator.platform));
@@ -338,80 +387,40 @@ export function Header() {
                 <p className="text-lg sm:text-xl font-bold tracking-tight truncate">Markdown Converter</p>
             </div>
             <div className="flex gap-1 sm:gap-2 items-center shrink-0">
-                <div
-                    className="flex gap-1 border-[var(--header-border)] pr-2 mr-1 sm:mr-2"
-                    role="toolbar"
-                    aria-label="File operations"
+                {/* Primary action */}
+                <Button
+                    variant="primary"
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    title={canSave ? `Save (${saveShortcutLabel})` : 'Select or create a project to save'}
+                    aria-label={isSaving ? 'Saving document' : `Save document (${saveShortcutLabel})`}
+                    className="gap-2"
                 >
-                    <IconButton
-                        label={isSaving ? 'Saving document' : `Save document (${saveShortcutLabel})`}
-                        title={`Save (${saveShortcutLabel})`}
-                        onClick={handleSave}
-                        disabled={isSaving || !canSave}
-                    >
-                        <Save className="w-5 h-5" />
-                    </IconButton>
-                    <label
-                        htmlFor="import-file-input"
-                        className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors cursor-pointer"
-                        title="Import File"
-                        aria-label="Import file"
-                    >
-                        <Upload className="w-5 h-5" />
-                    </label>
-                    <input id="import-file-input" type="file" accept=".md,.txt" onChange={handleImport} className="sr-only" />
-                    <IconButton
-                        label="Import markdown from URL"
-                        onClick={() => setOpenUrlImport(true)}
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
-                    </IconButton>
-                </div>
+                    <Save className="w-5 h-5" aria-hidden="true" />
+                    <span className="hidden sm:inline">Save</span>
+                </Button>
+                <input id="import-file-input" type="file" accept=".md,.txt" onChange={handleImport} className="sr-only" />
 
-                <ExportMenu
-                    shortcutLabel={exportShortcutLabel}
-                    onSelect={(format) => {
-                        // md/txt have no options — export directly instead of empty dialog (M-12)
-                        if (format === 'md' || format === 'txt') {
-                            void (async () => {
-                                setExporting(true);
-                                setExportProgress(0);
-                                try {
-                                    const { markdown, theme } = useMarkdownStore.getState();
-                                    const input = {
-                                        markdown,
-                                        ast: undefined,
-                                        theme: theme as ThemeTokens,
-                                        options: {
-                                            includeTheme: false,
-                                            includeTableOfContents: false,
-                                            pageSize: 'A4' as const,
-                                            orientation: 'portrait' as const,
-                                            margins: { top: 10, right: 10, bottom: 10, left: 10 },
-                                            fontSize: 12,
-                                            headerFooter: false,
-                                            embedImages: false,
-                                            syntaxHighlight: false,
-                                        },
-                                        metadata: await buildExportMetadata(),
-                                        onProgress: (p: number) => setExportProgress(p),
-                                    };
-                                    const result = await ExportOrchestrator.export(format, input);
-                                    await triggerDownload(result.blob, result.filename);
-                                    toast.success(`Exported ${result.filename}`);
-                                } catch (error) {
-                                    toast.error(error instanceof Error ? error.message : 'Export failed');
-                                } finally {
-                                    setExporting(false);
-                                    setExportProgress(undefined);
-                                }
-                            })();
-                            return;
+                {/* Export split-button: main repeats last format, chevron opens the menu */}
+                <div className="flex items-center" role="group" aria-label="Export">
+                    <IconButton
+                        label={`Export as ${lastFormat.toUpperCase()} (${exportShortcutLabel})`}
+                        onClick={() => startExport(lastFormat)}
+                        className="rounded-r-none"
+                    >
+                        <Download className="w-5 h-5" aria-hidden="true" />
+                    </IconButton>
+                    <ExportMenu
+                        shortcutLabel={exportShortcutLabel}
+                        onSelect={handleFormatSelect}
+                        activeFormat={lastFormat}
+                        trigger={
+                            <IconButton label="Choose export format" className="rounded-l-none -ml-2 px-1 min-w-[36px]">
+                                <ChevronDown className="w-4 h-4" aria-hidden="true" />
+                            </IconButton>
                         }
-                        setExportFormat(format);
-                        setOptionsOpen(true);
-                    }}
-                />
+                    />
+                </div>
 
                 <ExportOptionsDialog
                     open={optionsOpen}
@@ -453,29 +462,7 @@ export function Header() {
                     message={exportProgress ? `Exporting... ${Math.round(exportProgress)}%` : 'Exporting...'}
                 />
 
-                <IconButton
-                    label={scrollSyncEnabled ? 'Disable scroll sync' : 'Enable scroll sync'}
-                    aria-pressed={scrollSyncEnabled}
-                    active={scrollSyncEnabled}
-                    onClick={toggleScrollSyncEnabled}
-                    className={scrollSyncEnabled ? '' : 'text-[var(--sidebar-muted)]'}
-                >
-                    <ArrowUpDown className="w-5 h-5" />
-                </IconButton>
-
-                <IconButton
-                    label="Copy markdown to clipboard"
-                    onClick={() => {
-                        void navigator.clipboard.writeText(markdown).then(
-                            () => toast.success('Markdown copied!'),
-                            () => toast.error('Copy failed')
-                        );
-                    }}
-                >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-                </IconButton>
-
-                <div className="hidden md:flex gap-1 border-l border-[var(--header-border)] pl-2 ml-1" role="toolbar" aria-label="View mode">
+                <div className="hidden min-[480px]:flex gap-1 border-l border-[var(--header-border)] pl-2 ml-1" role="toolbar" aria-label="View mode">
                     <IconButton
                         label="Editor only"
                         aria-pressed={viewMode === 'editor'}
@@ -501,6 +488,72 @@ export function Header() {
                         <Eye className="w-5 h-5" />
                     </IconButton>
                 </div>
+
+                {/* Overflow: secondary actions live here on all sizes */}
+                <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                        <IconButton label="More actions">
+                            <MoreVertical className="w-5 h-5" aria-hidden="true" />
+                        </IconButton>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                        <DropdownMenu.Content
+                            className="bg-[var(--dropdown-bg)] border border-[var(--dropdown-border)] rounded p-2 shadow-lg min-w-[220px] z-[120]"
+                            sideOffset={5}
+                            aria-label="More actions"
+                        >
+                            <DropdownMenu.Item
+                                onSelect={() => document.getElementById('import-file-input')?.click()}
+                                className="flex items-center gap-2 p-1 min-h-[36px] hover:bg-[var(--dropdown-hover)] cursor-pointer rounded text-[var(--dropdown-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                            >
+                                <Upload className="w-4 h-4" aria-hidden="true" />
+                                <span className="text-sm">Import file…</span>
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item
+                                onSelect={() => setOpenUrlImport(true)}
+                                className="flex items-center gap-2 p-1 min-h-[36px] hover:bg-[var(--dropdown-hover)] cursor-pointer rounded text-[var(--dropdown-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                            >
+                                <Link2 className="w-4 h-4" aria-hidden="true" />
+                                <span className="text-sm">Import from URL…</span>
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item
+                                onSelect={() => {
+                                    void navigator.clipboard.writeText(markdown).then(
+                                        () => toast.success('Markdown copied!'),
+                                        () => toast.error('Copy failed')
+                                    );
+                                }}
+                                className="flex items-center gap-2 p-1 min-h-[36px] hover:bg-[var(--dropdown-hover)] cursor-pointer rounded text-[var(--dropdown-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                            >
+                                <Copy className="w-4 h-4" aria-hidden="true" />
+                                <span className="text-sm">Copy markdown</span>
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Separator className="h-px my-1 bg-[var(--dropdown-border)]" />
+                            <DropdownMenu.CheckboxItem
+                                checked={scrollSyncEnabled}
+                                onCheckedChange={() => toggleScrollSyncEnabled()}
+                                className="flex items-center gap-2 p-1 min-h-[36px] hover:bg-[var(--dropdown-hover)] cursor-pointer rounded text-[var(--dropdown-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                            >
+                                <ArrowUpDown className="w-4 h-4" aria-hidden="true" />
+                                <span className="text-sm">Scroll sync</span>
+                            </DropdownMenu.CheckboxItem>
+                            <DropdownMenu.Separator className="h-px my-1 bg-[var(--dropdown-border)]" />
+                            <DropdownMenu.Label className="px-1 py-1 text-xs uppercase tracking-wider text-[var(--sidebar-muted)]">
+                                View
+                            </DropdownMenu.Label>
+                            {(['editor', 'split', 'preview'] as const).map((mode) => (
+                                <DropdownMenu.CheckboxItem
+                                    key={mode}
+                                    checked={viewMode === mode}
+                                    onCheckedChange={() => setViewMode(mode)}
+                                    className="flex items-center gap-2 p-1 min-h-[36px] hover:bg-[var(--dropdown-hover)] cursor-pointer rounded text-[var(--dropdown-fg)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                                >
+                                    <span className="text-sm capitalize">{mode === 'split' ? 'Split view' : `${mode} only`}</span>
+                                </DropdownMenu.CheckboxItem>
+                            ))}
+                        </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                </DropdownMenu.Root>
 
                 <Dialog.Root open={settingsOpen} onOpenChange={setSettingsOpen}>
                     <Dialog.Trigger asChild>

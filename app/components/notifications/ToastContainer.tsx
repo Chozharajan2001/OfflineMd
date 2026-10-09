@@ -13,12 +13,14 @@ const MAX_VISIBLE_TOASTS = 4;
 
 /**
  * Toast notification container.
- * 
+ *
  * Features:
  * - Stacks notifications in top-right corner
  * - Limits visible toasts to prevent overflow
- * - Accessible with aria-live region
  * - Fixed position, high z-index
+ *
+ * Note: no aria-live here — each Toast has role="status" (implicit live
+ * region), so a container live region would double-announce (m-20/m-21).
  */
 export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   // Only show most recent toasts (store itself is capped; this is the view window)
@@ -27,7 +29,6 @@ export function ToastContainer({ toasts, onRemove }: ToastContainerProps) {
   return (
     <div
       className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-md pointer-events-auto"
-      aria-live="polite"
     >
       {visibleToasts.map((toast) => (
         <Toast key={toast.id} toast={toast} onClose={onRemove} />

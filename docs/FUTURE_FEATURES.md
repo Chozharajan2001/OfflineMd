@@ -3,13 +3,10 @@
 Re-checked against the source on 2026-10-04. Items this file previously listed as "not yet done"
 but which **are** implemented are recorded at the bottom so they are not re-added later.
 
-- **Wire up offline / PWA support**
-  - The highest-impact gap, because every document sells the app as "works completely offline".
-  - `next-pwa` is in `package.json` and `public/manifest.json` is linked from `app/layout.tsx:21`,
-    but `next.config.ts` never wraps the config with `withPWA` and nothing calls
-    `navigator.serviceWorker.register`. The checked-in `public/sw.js` and
-    `public/workbox-4754cb34.js` are dead artefacts.
-  - Either finish the wiring or remove the dependency, the stale worker files, and the claim.
+- **Wire up offline / PWA support** — DONE 2026-10-09: migrated to `@serwist/next`
+  (`app/sw.ts` + `SwRegister`), stale artefacts deleted, generated worker git-ignored.
+  - (Original note, kept for history: `next-pwa` was in `package.json` but `next.config.ts`
+    never wrapped the config and nothing registered the worker.)
 
 - **Move / reparent tree nodes**
   - Create, rename and delete exist (`Sidebar.tsx:111`, `:147`, `:180`), but `parentId` never

@@ -26,7 +26,7 @@ The Markdown Editor & Converter is a privacy-first, offline-capable markdown edi
 ### Core Principles
 
 - **Privacy First**: All data stored locally, never transmitted
-- **Offline Capability**: ⚠️ Not currently working — `next-pwa` is installed but `withPWA` is not applied in `next.config.ts` and no service worker is registered
+- **Offline Capability**: Serwist service worker (`app/sw.ts`, registered by `SwRegister` in production) precaches the app shell; IndexedDB persists data offline. Monaco Editor still loads from CDN at runtime (see M6).
 - **Zero Cost**: Free forever, no premium tiers
 - **Open Source**: Community-driven development
 - **Professional Tools**: IDE-quality editing experience
@@ -111,12 +111,11 @@ npm run lint     # ESLint checking
 - **pdf-lib**: PDF generation
 - **docx.js**: Word document creation
 - **file-saver**: Client-side downloads
-- **html2pdf.js**: Alternative PDF export (legacy)
 
 ### Build & Development
 - **ESLint**: 9.x with Next.js config
 - **PostCSS**: Tailwind processing
-- **next-pwa**: PWA configuration
+- **@serwist/next**: PWA service worker (replaced `next-pwa@5`, incompatible with Next 16)
 
 ---
 

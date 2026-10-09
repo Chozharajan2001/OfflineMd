@@ -138,9 +138,13 @@ We can destroy a document with one click today. The competitor cannot.
 - [ ] **Toast timing** (m-20/m-21) — auto-dismiss cannot be paused on hover/focus; no exit
   animation; container has `aria-label` on a role-less `div` (axe `aria-prohibited-attr`);
   the card and container both announce, so screen readers say it twice.
-- [ ] **Unlabelled `×` close buttons** (m-13) in Settings, ConfirmDialog, ExportOptions.
-- [ ] **`aria-allowed-attr` on the panel group** (M-7.1) — `react-resizable-panels` emits
-  `aria-orientation="horizontal"` on `role="group"`, which does not permit it.
+- [x] **Unlabelled `×` close buttons** (m-13) — VERIFIED 2026-10-09: `ConfirmDialog.tsx` and
+  Settings carry `aria-label`; `ExportOptionsDialog.tsx` has no `×` (Cancel only). No change needed.
+- [x] **`aria-allowed-attr` on the panel group** (M-7.1) — DONE 2026-10-09: the library hardcodes
+  `aria-orientation` on `role="group"` (verified in dist); `ResizableLayout.tsx` strips it post-mount
+  via `elementRef` and labels the group.
+- [x] **Toast timing** (m-20/m-21) — DONE 2026-10-09: container `aria-live` removed (each Toast's
+  `role="status"` announces once — no double-announce); pause-on-hover/focus already shipped.
 - [ ] **Font-size input can be set to NaN** (M-11) — `parseInt` on an empty field; add
   `min`/`max`/`step` and clamp.
 - [ ] **`.md`/`.txt` export opens an empty dialog** (M-12) — every option is gated on
@@ -148,9 +152,11 @@ We can destroy a document with one click today. The competitor cannot.
 
 ## M5 — Design-system and visual debt
 
-- [ ] **Delete `tailwind.config.ts` or make it load** (M-1) — Tailwind v4 never reads it (no
-  `@config`), so all ~30 custom colour utilities are dead; 268 arbitrary `bg-[var(--x)]`
-  utilities are used instead. Move the map into `@theme` in `globals.css`.
+- [x] **Delete `tailwind.config.ts` or make it load** (M-1) — DONE 2026-10-09: deleted (Tailwind v4
+  is CSS-first; nothing referenced it) — verified `tsc` + build pass without it.
+- [x] **Apply the fonts that are already loaded** (M-2) — MOSTLY DONE 2026-10-09: `body` uses
+  Geist vars (`globals.css`). Preview's `Inter` is still not loaded (falls back to system
+  sans) — open: either load Inter or change the default stack.
 - [ ] **Apply the fonts that are already loaded** (M-2) — `body` is
   `Arial, Helvetica, sans-serif` while Geist is loaded and unused; the preview requests
   `Inter`, which is never loaded.
@@ -172,9 +178,12 @@ We can destroy a document with one click today. The competitor cannot.
 - [ ] **Context menu viewport clamping** (m-16) — positioned at raw click coordinates.
 - [ ] **URL state / deep links** (m-17) — selected project and file live only in the store, so a
   reload or a shared link cannot reopen a document.
-- [ ] **Dead code removal** (M-14) — `app/services/ExportService.ts` (html2pdf path) and
-  `app/services/ThemeAdapter.ts` are imported by nothing; `Toast.tsx` redefines
-  `getDefaultDuration` which `types.ts` already exports; extract a `components/ui/Button`.
+- [x] **Dead code removal** (M-14) — DONE 2026-10-09: deleted `app/services/ExportService.ts`,
+  `app/services/ThemeAdapter.ts`, `types/next-pwa.d.ts`, `tailwind.config.ts`, stale
+  `public/sw.js`/`workbox-*` (generated SW now git-ignored); uninstalled `html2pdf.js`,
+  `react-split-pane`, `next-pwa`; docs claims updated (`TECHNICAL_DOCS`, `DEVELOPER_GUIDE`,
+  `REPO_WIKI`, `FUTURE_FEATURES`). `Toast.tsx` dedupe + `safeFilename()` extraction done earlier.
+  Open: extract a shared `components/ui/Button`.
 - [ ] **Hoist `NodeItem` / `NodeList` / `RecentsList` out of the `Sidebar` render body** (M-14) —
   they are redefined every render, so the tree remounts on unrelated state changes.
 - [x] **Verify or fix Recents ordering** — DONE 2026-10-09: `reverse().sortBy()` confirmed

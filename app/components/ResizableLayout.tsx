@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
     Panel,
     Group,
@@ -12,6 +12,14 @@ import { useMarkdownStore } from '../store';
 
 export function ResizableLayout() {
     const viewMode = useMarkdownStore((s) => s.viewMode);
+    const groupEl = useRef<HTMLDivElement | null>(null);
+
+    // react-resizable-panels hardcodes aria-orientation on role="group",
+    // which ARIA forbids (M-7.1). Strip it post-mount; orientation is still
+    // conveyed visually and via the labelled separator.
+    useEffect(() => {
+        groupEl.current?.removeAttribute('aria-orientation');
+    }, [viewMode]);
 
     if (viewMode === 'editor') {
         return (
@@ -31,7 +39,7 @@ export function ResizableLayout() {
 
     return (
         <div className="flex-1 h-full overflow-hidden">
-            <Group orientation="horizontal">
+            <Group orientation="horizontal" elementRef={groupEl} aria-label="Editor and preview panes">
                 <Panel defaultSize={50} minSize={20}>
                     <Editor />
                 </Panel>

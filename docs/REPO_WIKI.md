@@ -119,12 +119,11 @@ Complete documentation and knowledge base for the Markdown Editor & Converter pr
 | **docx** | 9.5.1 | Word document creation |
 | **pptxgenjs** | 3.12.0 | PowerPoint creation |
 | **file-saver** | 2.0.5 | Client-side file saving |
-| **html2pdf.js** | 0.14.0 | Alternative PDF export (legacy) |
 
 ### Build & PWA
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| **next-pwa** | 5.6.0 | PWA configuration |
+| **@serwist/next** | 9.x | PWA service worker (replaced `next-pwa@5`) |
 | **ESLint** | 9.x | Code linting |
 | **PostCSS** | 4.x | CSS processing |
 | **@tailwindcss/postcss** | 4.x | Tailwind PostCSS plugin |
@@ -161,7 +160,6 @@ flowchart TD
 
     subgraph Service_Layer[`Service Layer`]
         MarkdownParser[MarkdownParser]
-        ExportService[ExportService]
         ExportOrchestrator[ExportOrchestrator]
     end
 
@@ -172,6 +170,7 @@ flowchart TD
         DocxExporter[DocxExporter]
         PlaintextExporter[PlaintextExporter]
         PptxExporter[PptxExporter]
+        PngExporter[PngExporter]
     end
 
     subgraph Storage_Layer[`Storage Layer`]
@@ -622,9 +621,8 @@ User Action (Create/Delete/Load)
 ### 1. Privacy & Offline
 - ✅ 100% client-side storage using IndexedDB (via Dexie.js)
 - ✅ No backend data service — all data stays on your device
-- ⚠️ Offline/PWA support is **not currently working**: `next-pwa` is a dependency but
-  `next.config.ts` never applies `withPWA`, and no code registers a service worker
-- ❌ Service worker caching of static assets — not active (see above)
+- ✅ Offline/PWA support via Serwist (`app/sw.ts`, registered by `SwRegister` in production)
+- ✅ Service worker caching of static assets (precache + runtime `defaultCache`)
 - ✅ No account required, no data collection
 
 ### 2. Editor Features
@@ -1417,13 +1415,12 @@ markdown-converter/
 **A**: Yes! All data is stored in your browser's IndexedDB. Nothing is transmitted to servers.
 
 ### Q: Can I use this offline?
-**A**: Not fully, as things stand. Your notes live in IndexedDB so they survive an offline reload
-of an already-cached page, but the service worker is never registered (`next-pwa` is installed
-without `withPWA` in `next.config.ts`), so the app shell is not cached and a cold start without
-network will fail. Wiring this up is the top item on the roadmap.
+**A**: Yes — a Serwist service worker (`app/sw.ts`) precaches the app shell and runtime-caches
+static assets, and notes live in IndexedDB. Caveat: Monaco Editor loads from CDN at runtime, so
+the editor pane needs network until Monaco is bundled (M6).
 
 ### Q: How do I export my documents?
-**A**: Click the Export button in the header, choose your format (Markdown, HTML, PDF, DOCX, TXT, or PPTX), configure options, and download.
+**A**: Click the Export button in the header, choose your format (Markdown, HTML, PDF, DOCX, TXT, PPTX, or PNG), configure options, and download.
 
 ### Q: Can I organize files into folders?
 **A**: Yes! The app supports hierarchical folder structures within projects.

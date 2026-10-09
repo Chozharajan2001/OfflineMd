@@ -776,7 +776,7 @@ export function Sidebar() {
                 {/* Mobile close button */}
                 <button
                     type="button"
-                    className="lg:hidden absolute top-2 right-2 text-[var(--sidebar-icon)] hover:text-[var(--sidebar-fg)] z-50"
+                    className="lg:hidden absolute top-3 right-3 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-full bg-[var(--sidebar-bg)] text-[var(--sidebar-icon)] hover:text-[var(--sidebar-fg)] z-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                     onClick={() => setIsMobileOpen(false)}
                     aria-label="Close sidebar"
                 >
@@ -798,7 +798,8 @@ export function Sidebar() {
 
                 {/* Projects Dropdown / Header */}
                 <div className="p-3 border-[var(--sidebar-border)]" role="group" aria-label="Projects">
-                    <div className="flex justify-between items-center mb-2">
+                    {/* pr reserves room for the mobile close × (36px at right-3 → 48px, lg:hidden) */}
+                    <div className="flex justify-between items-center mb-2 pr-12 lg:pr-0">
                         <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider">Projects</h2>
                         <button
                             type="button"

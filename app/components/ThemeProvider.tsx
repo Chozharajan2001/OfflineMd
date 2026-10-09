@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { useMarkdownStore } from '../store';
 import { useMonaco } from '@monaco-editor/react';
 import { accentTextFor } from '../../src/export/utils/theme-validation';
@@ -23,12 +23,13 @@ const getLuminance = (hex: string): number => {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const { theme } = useMarkdownStore();
     const monaco = useMonaco();
-    const [isMounted, setIsMounted] = useState(false);
-
-    // Ensure we only run effects after component mounts to avoid SSR issues
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
+    // Mounted flag without set-state-in-effect: subscribe is a no-op, so this
+    // flips false (server/first paint) → true (hydrated) with no extra render loop.
+    const isMounted = useSyncExternalStore(
+        () => () => {},
+        () => true,
+        () => false
+    );
 
     // 1. Sync CSS Variables for Tailwind/UI
     useEffect(() => {

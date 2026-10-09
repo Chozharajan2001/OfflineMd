@@ -14,7 +14,9 @@ files the audit fixes already touched.
 ## Definition of done for every item
 
 1. `npx tsc --noEmit` clean and `npm run build` succeeds.
-2. `npx eslint .` stays at the **pre-existing baseline of 5 errors / 90 warnings** — no new ones.
+2. `npx eslint .` clean — **0 errors / 0 warnings** since 2026-10-09 (was 5/90 baseline;
+   generated `public/sw.js` is now eslint-ignored, last source error fixed via
+   `useSyncExternalStore` in `ThemeProvider.tsx`).
 3. The behaviour is checked in a real browser, not inferred from code. There is **no test suite**
    in this repo, so the browser check is the only functional gate.
 4. If it fixes a documented claim, the docs in `docs/` and the root README are updated too.

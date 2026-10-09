@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState, useEffect } from 'react';
 import type { ExportFormat, ExportOptions } from '../types';
+import { Button } from '../../../app/components/ui';
 
 const defaultOptions: ExportOptions = {
     includeTheme: true,
@@ -186,22 +187,20 @@ export function ExportOptionsDialog({
                     </div>
 
                     <div className="mt-4 flex justify-end gap-2">
-                        <button
-                            type="button"
+                        <Button
+                            variant="secondary"
                             onClick={() => onOpenChange(false)}
-                            className="px-3 py-1 bg-[var(--button-secondary-bg)] rounded hover:bg-[var(--button-secondary-hover)] text-[var(--button-fg)] disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={isSubmitting}
                         >
                             Cancel
-                        </button>
-                        <button
-                            type="button"
+                        </Button>
+                        <Button
+                            variant="primary"
                             onClick={() => void handleExport()}
-                            className="px-3 py-1 bg-[var(--button-primary-bg)] rounded hover:bg-[var(--button-primary-hover)] text-[var(--button-fg)] disabled:opacity-50 disabled:cursor-not-allowed"
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? 'Exporting...' : 'Export'}
-                        </button>
+                        </Button>
                     </div>
                 </Dialog.Content>
             </Dialog.Portal>

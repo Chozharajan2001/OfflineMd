@@ -2,6 +2,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '../ui';
 
 interface InputDialogProps {
   open: boolean;
@@ -132,19 +133,17 @@ export function InputDialog({
 
           <div className="mt-4 flex justify-end gap-2">
             <Dialog.Close asChild>
-              <button 
-                className="rounded bg-[var(--button-secondary-bg)] px-3 py-1.5 text-[var(--button-fg)] hover:bg-[var(--button-secondary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              >
+              <Button variant="secondary">
                 {cancelText}
-              </button>
+              </Button>
             </Dialog.Close>
-            <button
+            <Button
+              variant="primary"
               onClick={() => void handleSubmit()}
               disabled={submitting}
-              className="rounded bg-[var(--button-primary-bg)] px-3 py-1.5 text-[var(--button-fg)] hover:bg-[var(--button-primary-hover)] disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             >
               {submitting ? 'Saving...' : submitText}
-            </button>
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

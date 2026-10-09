@@ -7,6 +7,7 @@ import { useMarkdownStore } from '../store';
 import { db, FileNode } from '../services/Database';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ConfirmDialog, InputDialog } from './dialogs';
+import { Button } from './ui';
 import { TableOfContents } from './TableOfContents';
 import { useToast } from './notifications/useToast';
 import { buildProjectZip } from '../utils/zip-project';
@@ -1089,16 +1090,16 @@ export function Sidebar() {
                         </select>
                         <div className="mt-4 flex justify-end gap-2">
                             <Dialog.Close asChild>
-                                <button className="rounded bg-[var(--button-secondary-bg)] px-3 py-1.5 text-[var(--button-fg)] hover:bg-[var(--button-secondary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
+                                <Button variant="secondary">
                                     Cancel
-                                </button>
+                                </Button>
                             </Dialog.Close>
-                            <button
+                            <Button
+                                variant="primary"
                                 onClick={() => void handleMoveConfirm()}
-                                className="rounded bg-[var(--button-primary-bg)] px-3 py-1.5 text-[var(--button-fg)] hover:bg-[var(--button-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                             >
                                 Move
-                            </button>
+                            </Button>
                         </div>
                     </Dialog.Content>
                 </Dialog.Portal>

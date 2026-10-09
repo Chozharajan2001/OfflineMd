@@ -13,6 +13,7 @@ import { triggerDownload } from '../../src/export/utils/file-saver';
 import { db } from '../services/Database';
 import { buildWorkspaceBackup, restoreWorkspaceBackup } from '../utils/backup';
 import { ConfirmDialog, InputDialog } from './dialogs';
+import { Button, IconButton } from './ui';
 import { useToast } from './notifications/useToast';
 
 export function Header() {
@@ -327,15 +328,13 @@ export function Header() {
     return (
         <header className="bg-[var(--header-bg)] text-[var(--header-fg)] p-3 sm:p-4 flex justify-between items-center gap-2 border-b border-[var(--header-border)]">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-                <button
-                    type="button"
-                    className="p-2 shrink-0 hover:bg-[var(--header-hover)] rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                <IconButton
+                    label="Toggle sidebar"
                     onClick={handleSidebarToggle}
-                    title="Toggle Sidebar"
-                    aria-label="Toggle sidebar"
+                    className="shrink-0"
                 >
                     <Menu className="w-5 h-5" />
-                </button>
+                </IconButton>
                 <p className="text-lg sm:text-xl font-bold tracking-tight truncate">Markdown Converter</p>
             </div>
             <div className="flex gap-1 sm:gap-2 items-center shrink-0">
@@ -344,16 +343,14 @@ export function Header() {
                     role="toolbar"
                     aria-label="File operations"
                 >
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    <IconButton
+                        label={isSaving ? 'Saving document' : `Save document (${saveShortcutLabel})`}
                         title={`Save (${saveShortcutLabel})`}
-                        aria-label={isSaving ? 'Saving document' : `Save document (${saveShortcutLabel})`}
+                        onClick={handleSave}
                         disabled={isSaving || !canSave}
                     >
                         <Save className="w-5 h-5" />
-                    </button>
+                    </IconButton>
                     <label
                         htmlFor="import-file-input"
                         className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors cursor-pointer"
@@ -363,15 +360,12 @@ export function Header() {
                         <Upload className="w-5 h-5" />
                     </label>
                     <input id="import-file-input" type="file" accept=".md,.txt" onChange={handleImport} className="sr-only" />
-                    <button
-                        type="button"
+                    <IconButton
+                        label="Import markdown from URL"
                         onClick={() => setOpenUrlImport(true)}
-                        className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors"
-                        title="Import from URL"
-                        aria-label="Import markdown from URL"
                     >
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
-                    </button>
+                    </IconButton>
                 </div>
 
                 <ExportMenu
@@ -459,22 +453,18 @@ export function Header() {
                     message={exportProgress ? `Exporting... ${Math.round(exportProgress)}%` : 'Exporting...'}
                 />
 
-                <button
-                    type="button"
-                    className={`p-2 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${scrollSyncEnabled ? 'bg-[var(--header-hover)] text-[var(--header-fg)]' : 'hover:bg-[var(--header-hover)] text-[var(--sidebar-muted)]'}`}
-                    title={scrollSyncEnabled ? 'Disable Scroll Sync' : 'Enable Scroll Sync'}
-                    aria-label={scrollSyncEnabled ? 'Disable scroll sync' : 'Enable scroll sync'}
+                <IconButton
+                    label={scrollSyncEnabled ? 'Disable scroll sync' : 'Enable scroll sync'}
                     aria-pressed={scrollSyncEnabled}
+                    active={scrollSyncEnabled}
                     onClick={toggleScrollSyncEnabled}
+                    className={scrollSyncEnabled ? '' : 'text-[var(--sidebar-muted)]'}
                 >
                     <ArrowUpDown className="w-5 h-5" />
-                </button>
+                </IconButton>
 
-                <button
-                    type="button"
-                    className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors"
-                    title="Copy Markdown"
-                    aria-label="Copy markdown to clipboard"
+                <IconButton
+                    label="Copy markdown to clipboard"
                     onClick={() => {
                         void navigator.clipboard.writeText(markdown).then(
                             () => toast.success('Markdown copied!'),
@@ -483,51 +473,40 @@ export function Header() {
                     }}
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-                </button>
+                </IconButton>
 
                 <div className="hidden md:flex gap-1 border-l border-[var(--header-border)] pl-2 ml-1" role="toolbar" aria-label="View mode">
-                    <button
-                        type="button"
-                        onClick={() => setViewMode('editor')}
+                    <IconButton
+                        label="Editor only"
                         aria-pressed={viewMode === 'editor'}
-                        title="Editor only"
-                        aria-label="Editor only"
-                        className={`p-2 rounded transition-colors ${viewMode === 'editor' ? 'bg-[var(--header-hover)]' : 'hover:bg-[var(--header-hover)]'}`}
+                        active={viewMode === 'editor'}
+                        onClick={() => setViewMode('editor')}
                     >
                         <SquarePen className="w-5 h-5" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setViewMode('split')}
+                    </IconButton>
+                    <IconButton
+                        label="Split view"
                         aria-pressed={viewMode === 'split'}
-                        title="Split view"
-                        aria-label="Split view"
-                        className={`p-2 rounded transition-colors ${viewMode === 'split' ? 'bg-[var(--header-hover)]' : 'hover:bg-[var(--header-hover)]'}`}
+                        active={viewMode === 'split'}
+                        onClick={() => setViewMode('split')}
                     >
                         <Columns2 className="w-5 h-5" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setViewMode('preview')}
+                    </IconButton>
+                    <IconButton
+                        label="Preview only"
                         aria-pressed={viewMode === 'preview'}
-                        title="Preview only"
-                        aria-label="Preview only"
-                        className={`p-2 rounded transition-colors ${viewMode === 'preview' ? 'bg-[var(--header-hover)]' : 'hover:bg-[var(--header-hover)]'}`}
+                        active={viewMode === 'preview'}
+                        onClick={() => setViewMode('preview')}
                     >
                         <Eye className="w-5 h-5" />
-                    </button>
+                    </IconButton>
                 </div>
 
                 <Dialog.Root open={settingsOpen} onOpenChange={setSettingsOpen}>
                     <Dialog.Trigger asChild>
-                        <button
-                            type="button"
-                            className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors"
-                            title="Settings"
-                            aria-label="Open settings"
-                        >
+                        <IconButton label="Open settings">
                             <Settings className="w-5 h-5" />
-                        </button>
+                        </IconButton>
                     </Dialog.Trigger>
                     <Dialog.Portal>
                         <Dialog.Overlay className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm" />
@@ -574,19 +553,19 @@ export function Header() {
                                         </label>
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
+                                <Button
+                                    variant="primary"
                                     onClick={resetTheme}
-                                    className="w-full bg-[var(--button-primary-bg)] hover:bg-[var(--button-primary-hover)] text-[var(--button-fg)] py-2 rounded transition-colors font-medium"
+                                    className="w-full py-2"
                                 >
                                     Reset to Defaults
-                                </button>
+                                </Button>
 
                                 <div>
                                     <h3 className="font-medium text-[var(--sidebar-muted)] text-sm uppercase tracking-wider mb-2">Workspace backup</h3>
                                     <div className="flex gap-2">
-                                        <button
-                                            type="button"
+                                        <Button
+                                            variant="secondary"
                                             onClick={() => {
                                                 void buildWorkspaceBackup().then(
                                                     async ({ blob, filename }) => {
@@ -596,10 +575,10 @@ export function Header() {
                                                     (error) => toast.error(error instanceof Error ? error.message : 'Backup failed')
                                                 );
                                             }}
-                                            className="flex-1 px-3 py-2 rounded bg-[var(--button-secondary-bg)] hover:bg-[var(--button-secondary-hover)] text-[var(--button-fg)] font-medium transition-colors"
+                                            className="flex-1"
                                         >
                                             Export all
-                                        </button>
+                                        </Button>
                                         <label
                                             htmlFor="backup-restore-input"
                                             className="flex-1 px-3 py-2 rounded bg-[var(--button-secondary-bg)] hover:bg-[var(--button-secondary-hover)] text-[var(--button-fg)] font-medium transition-colors cursor-pointer text-center"

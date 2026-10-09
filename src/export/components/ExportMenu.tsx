@@ -2,6 +2,7 @@ import React from 'react';
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Download, FileText, File, FileStack, FileSymlink } from "lucide-react";
 import type { ExportFormat } from "../types";
+import { IconButton } from '../../../app/components/ui';
 
 interface ExportMenuProps {
     onSelect: (format: ExportFormat) => void;
@@ -22,14 +23,9 @@ export function ExportMenu({ onSelect, shortcutLabel }: ExportMenuProps) {
     return (
         <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-                <button
-                    className="p-2 hover:bg-[var(--header-hover)] rounded transition-colors"
-                    title={shortcutLabel ? `Export (${shortcutLabel})` : 'Export'}
-                    aria-label={shortcutLabel ? `Export document (${shortcutLabel})` : 'Export document'}
-                    aria-haspopup="menu"
-                >
+                <IconButton label={shortcutLabel ? `Export document (${shortcutLabel})` : 'Export document'}>
                     <Download className="w-5 h-5" />
-                </button>
+                </IconButton>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
                 <DropdownMenu.Content

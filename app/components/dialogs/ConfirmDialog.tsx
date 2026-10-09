@@ -2,6 +2,7 @@
 
 import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { Button } from '../ui';
 
 export interface ConfirmDialogProps {
   open: boolean;
@@ -67,26 +68,18 @@ export function ConfirmDialog({
           
           <div className="flex gap-3 justify-end">
             <Dialog.Close asChild>
-              <button
-                className="flex-1 px-4 py-2 bg-[var(--sidebar-hover)] hover:bg-[var(--sidebar-border)] 
-                         text-[var(--dialog-fg)] rounded transition-colors font-medium
-                         focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              >
+              <Button variant="secondary" className="flex-1">
                 {cancelText}
-              </button>
+              </Button>
             </Dialog.Close>
-            
-            <button
-                onClick={handleConfirm}
-                className={`flex-1 px-4 py-2 rounded transition-colors font-medium
-                          focus:outline-none focus:ring-2 focus:ring-[var(--accent)]
-                          ${destructive 
-                            ? 'bg-red-600 hover:bg-red-700 text-white' 
-                            : 'bg-[var(--button-primary-bg)] hover:bg-[var(--button-primary-hover)] text-[var(--button-fg)]'
-                          }`}
-              >
-                {confirmText}
-              </button>
+
+            <Button
+              variant={destructive ? 'danger' : 'primary'}
+              onClick={handleConfirm}
+              className="flex-1"
+            >
+              {confirmText}
+            </Button>
           </div>
           
           {/* Close button (X icon) */}

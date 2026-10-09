@@ -7,6 +7,7 @@ import { useMarkdownStore } from '../store';
 import { db, FileNode } from '../services/Database';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ConfirmDialog, InputDialog } from './dialogs';
+import { TableOfContents } from './TableOfContents';
 import { useToast } from './notifications/useToast';
 import { buildProjectZip } from '../utils/zip-project';
 import { triggerDownload } from '../../src/export/utils/file-saver';
@@ -768,6 +769,9 @@ export function Sidebar() {
                         </div>
                     )}
                 </div>
+
+                {/* In-app table of contents for the open document */}
+                {activeFileId && <TableOfContents />}
 
                 {/* Trash */}
                 {activeProjectId && (

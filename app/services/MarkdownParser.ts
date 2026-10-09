@@ -5,6 +5,7 @@ import rehypeStringify from 'rehype-stringify';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeSlug from 'rehype-slug';
 import rehypeSanitize from 'rehype-sanitize';
 import rehypeHighlight from 'rehype-highlight';
 import { visit } from 'unist-util-visit';
@@ -41,6 +42,7 @@ class MarkdownParser {
       .use(remarkMath)
       .use(remarkRehype, { allowDangerousHtml: true })
       .use(rehypeKatex)
+      .use(rehypeSlug)
       .use(rehypeSanitize, {
         // Strict allowlist for markdown-generated content (+ KaTeX output)
         tagNames: [

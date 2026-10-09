@@ -100,8 +100,19 @@ export function Preview() {
             }
         };
 
+        // TOC navigation from the sidebar contents list
+        const handleTocNavigate: EventListener = (event) => {
+            const e = event as CustomEvent<{ id: string }>;
+            const target = previewRef.current?.querySelector(`#${CSS.escape(e.detail.id)}`);
+            target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        };
+
         window.addEventListener('editor-scroll', handleEditorScroll);
-        return () => window.removeEventListener('editor-scroll', handleEditorScroll);
+        window.addEventListener('toc-navigate', handleTocNavigate);
+        return () => {
+            window.removeEventListener('editor-scroll', handleEditorScroll);
+            window.removeEventListener('toc-navigate', handleTocNavigate);
+        };
     }, [isClient]);
 
     // Mermaid costs ~1 MB of JavaScript, so load it only when the rendered

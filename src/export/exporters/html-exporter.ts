@@ -4,6 +4,7 @@ import { themeToCSS } from '../utils/theme-to-css';
 import { sanitizeHTML } from '../utils/sanitizer';
 import { highlightThemeCSS } from '../utils/highlight-theme';
 import { extractTitle, safeFilename } from '../utils/safe-filename';
+import { extractToc } from '../../../app/components/TableOfContents';
 
 export class HtmlExporter implements IExporter {
     format: ExportFormat = 'html';
@@ -85,8 +86,23 @@ export class HtmlExporter implements IExporter {
             if (options.includeTheme) styleParts.push(themeToCSS(theme));
             styleParts.push(highlightThemeCSS);
             styleParts.push('.preview-content .mermaid-diagram{margin:1.25rem 0;overflow:auto;}');
+            styleParts.push('.preview-content .export-toc{border:1px solid #ddd;border-radius:8px;padding:1rem 1.5rem;margin:0 0 2rem;}');
+            styleParts.push('.preview-content .export-toc ul{list-style:none;padding-left:0;}');
+            styleParts.push('.preview-content .export-toc li{margin:0.25rem 0;}');
             const styleBlock = `<style>${styleParts.join('\n')}</style>`;
             const escapedDocTitle = this.escapeHtml(metadata?.title || 'Untitled Document');
+
+            // Optional table of contents (honors the export dialog flag)
+            let tocBlock = '';
+            if (options.includeTableOfContents) {
+                const entries = extractToc(markdown);
+                if (entries.length > 0) {
+                    const items = entries
+                        .map((e) => `    <li style="margin-left:${(e.level - 1) * 1.25}rem"><a href="#${e.id}">${this.escapeHtml(e.text)}</a></li>`)
+                        .join('\n');
+                    tocBlock = `<nav class="export-toc" aria-label="Table of contents">\n  <strong>Contents</strong>\n  <ul>\n${items}\n  </ul>\n</nav>\n  `;
+                }
+            }
 
             // Create self-contained HTML document
             const fullHtml = `<!DOCTYPE html>
@@ -98,7 +114,7 @@ export class HtmlExporter implements IExporter {
   ${styleBlock}
 </head>
 <body class="preview-content">
-  ${htmlWithMermaid}
+  ${tocBlock}${htmlWithMermaid}
 </body>
 </html>`;
 

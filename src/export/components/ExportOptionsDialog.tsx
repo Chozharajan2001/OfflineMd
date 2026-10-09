@@ -91,6 +91,7 @@ export function ExportOptionsDialog({
     const supportsTheme = format === 'html' || format === 'pdf' || format === 'docx' || format === 'pptx' || format === 'png';
     const supportsPageLayout = format === 'pdf';
     const supportsImages = format === 'html' || format === 'pdf';
+    const supportsToc = format === 'html';
 
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -137,6 +138,18 @@ export function ExportOptionsDialog({
                                     id="option-embed-images"
                                 />
                                 <span>Embed Images</span>
+                            </label>
+                        )}
+
+                        {supportsToc && (
+                            <label className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    checked={options.includeTableOfContents}
+                                    onChange={e => setOptions(prev => ({ ...prev, includeTableOfContents: e.target.checked }))}
+                                    id="option-include-toc"
+                                />
+                                <span>Include table of contents</span>
                             </label>
                         )}
 

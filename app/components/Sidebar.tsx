@@ -451,7 +451,14 @@ export function Sidebar() {
         if (!isFiltering) return null;
 
         const visible = new Set<number>();
-        const matched = projectNodes.filter((node) => node.name.toLowerCase().includes(normalizedQuery));
+        // Match names AND file content (substring, case-insensitive)
+        const matched = projectNodes.filter((node) => {
+            if (node.name.toLowerCase().includes(normalizedQuery)) return true;
+            if (node.type === 'file' && typeof node.content === 'string') {
+                return node.content.toLowerCase().includes(normalizedQuery);
+            }
+            return false;
+        });
 
         for (const node of matched) {
             if (typeof node.id !== 'number') continue;
@@ -469,6 +476,34 @@ export function Sidebar() {
     }, [isFiltering, nodeById, normalizedQuery, projectNodes]);
 
     const hasFilterMatches = !isFiltering || ((visibleNodeIds?.size || 0) > 0);
+
+    const toggleFavorite = async (id: number, value: boolean) => {
+        await db.nodes.update(id, { isFavorite: value || undefined, updatedAt: new Date() });
+    };
+
+    /** Highlight query matches in a file/folder name. */
+    const highlightName = (name: string) => {
+        if (!isFiltering) return name;
+        const idx = name.toLowerCase().indexOf(normalizedQuery);
+        if (idx === -1) return name;
+        return (
+            <>
+                {name.slice(0, idx)}
+                <mark className="bg-yellow-500/40 rounded-sm">{name.slice(idx, idx + normalizedQuery.length)}</mark>
+                {name.slice(idx + normalizedQuery.length)}
+            </>
+        );
+    };
+
+    /** First content line containing the query, for content-only matches. */
+    const contentSnippet = (node: FileNode): string | null => {
+        if (!isFiltering || node.type !== 'file' || typeof node.content !== 'string') return null;
+        if (node.name.toLowerCase().includes(normalizedQuery)) return null;
+        const line = node.content.split('\n').find((l) => l.toLowerCase().includes(normalizedQuery));
+        if (!line) return null;
+        const trimmed = line.trim().slice(0, 80);
+        return trimmed.length < line.trim().length ? `${trimmed}…` : trimmed;
+    };
 
     // -- Render Helpers --
 
@@ -499,7 +534,7 @@ export function Sidebar() {
                         >
                             {isExpanded ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
                             <Folder size={14} className="text-[var(--accent)]" aria-hidden="true" />
-                            <span className="text-sm">{node.name}</span>
+                            <span className="text-sm">{highlightName(node.name)}</span>
                         </button>
                         <div className="ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
                             <button
@@ -533,7 +568,7 @@ export function Sidebar() {
             >
                 <button
                     type="button"
-                    className="flex-1 flex items-center gap-2 text-left focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded"
+                    className="flex-1 flex items-center gap-2 text-left focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded min-w-0"
                     onClick={() => loadFile(node.id!)}
                     onKeyDown={(e) => {
                         if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
@@ -542,8 +577,28 @@ export function Sidebar() {
                         }
                     }}
                 >
-                    <FileText size={14} aria-hidden="true" />
-                    <span className="truncate">{node.name}</span>
+                    <FileText size={14} aria-hidden="true" className="shrink-0" />
+                    <span className="truncate">
+                        {highlightName(node.name)}
+                        {(() => {
+                            const snippet = contentSnippet(node);
+                            return snippet ? (
+                                <span className="block text-[11px] opacity-70 truncate">…{snippet}</span>
+                            ) : null;
+                        })()}
+                    </span>
+                </button>
+                <button
+                    type="button"
+                    className={`rounded p-1 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${node.isFavorite ? 'text-yellow-400' : 'text-[var(--sidebar-icon)] hover:text-yellow-400 opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+                    onClick={() => void toggleFavorite(node.id!, !node.isFavorite)}
+                    title={node.isFavorite ? 'Unpin' : 'Pin to favorites'}
+                    aria-label={node.isFavorite ? `Unpin ${node.name}` : `Pin ${node.name} to favorites`}
+                    aria-pressed={!!node.isFavorite}
+                >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill={node.isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
                 </button>
                 <button
                     type="button"
@@ -602,6 +657,39 @@ export function Sidebar() {
                         }}
                     >
                         <FileText size={12} aria-hidden="true" />
+                        <span className="truncate">{file.name}</span>
+                    </button>
+                ))}
+            </div>
+        );
+    };
+
+    const FavoritesList = () => {
+        // isFavorite is unindexed (booleans aren't valid IndexedDB keys) — filter in memory
+        const favs = useLiveQuery(() =>
+            db.nodes
+                .filter((n) => n.isFavorite === true && !n.deletedAt && n.type === 'file')
+                .sortBy('updatedAt')
+        ) || [];
+
+        const favorites = [...favs].reverse();
+
+        if (favorites.length === 0) return <div className="text-[var(--sidebar-muted)] text-xs italic">No favorites yet — star a file to pin it</div>;
+
+        return (
+            <div className="space-y-1">
+                {favorites.map(file => (
+                    <button
+                        key={file.id}
+                        className="flex items-center gap-2 p-1 hover:bg-[var(--sidebar-hover)] rounded w-full text-left text-xs text-[var(--sidebar-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                        onClick={() => {
+                            if (file.projectId) setActiveProject(file.projectId);
+                            loadFile(file.id!);
+                        }}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-yellow-400 shrink-0" aria-hidden="true">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        </svg>
                         <span className="truncate">{file.name}</span>
                     </button>
                 ))}
@@ -692,6 +780,12 @@ export function Sidebar() {
                 <div className="p-3 border-[var(--sidebar-border)]" role="group" aria-label="Recent files">
                     <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider mb-2">Recents</h2>
                     <RecentsList />
+                </div>
+
+                {/* Favorites */}
+                <div className="p-3 border-[var(--sidebar-border)]" role="group" aria-label="Favorite files">
+                    <h2 className="text-xs font-bold text-[var(--sidebar-muted)] uppercase tracking-wider mb-2">Favorites</h2>
+                    <FavoritesList />
                 </div>
 
                 {/* File Tree */}

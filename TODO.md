@@ -102,10 +102,13 @@ We can destroy a document with one click today. The competitor cannot.
 - [x] **Copy Markdown to clipboard** (gap A12) — DONE 2026-10-09: header copy button with
   clipboard + toast (`Header.tsx`).
 - [ ] **PlantUML** (gap A6) — lower priority than math; needs a rendering service or a WASM build.
-- [ ] **Search inside document content, across projects** (audit M-search)
-  - Today `Sidebar.tsx` filters node **names** in the active project by substring.
-  - Add content search with result highlighting and fuzzy matching.
-- [ ] **Favorites / pinning** (gap) — their Explorer has All / Recent / Favs.
+- [x] **Search inside document content, across projects** (audit M-search) — DONE 2026-10-09:
+  `Sidebar.tsx` search now matches file **content** (substring, case-insensitive) as well as names,
+  keeps folder context, highlights name matches with `<mark>` and shows the first matching content
+  line as a snippet. (Fuzzy matching still open.)
+- [x] **Favorites / pinning** (gap) — DONE 2026-10-09: `isFavorite` flag (Dexie `version(4)`,
+  unindexed — booleans aren't valid IndexedDB keys), star toggle on file rows, Favorites group
+  with jump-to-file. Survives backup/restore (whole-row).
 
 ## M4 — Accessibility debt (audit M-7 … M-11, m-13 … m-17)
 

@@ -17,6 +17,7 @@ export interface FileNode {
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null; // Soft-delete (trash); null/undefined = visible
+  isFavorite?: boolean; // Pinning (favorites); undefined/false = normal
   isOpen?: boolean; // For folder expansion state (optional storage)
 }
 
@@ -36,6 +37,13 @@ export class MarkdownDB extends Dexie {
     // v3: soft-delete. Existing rows get deletedAt=undefined (visible).
     // Indexed on deletedAt so trash queries stay cheap.
     this.version(3).stores({
+      projects: '++id, name, updatedAt',
+      nodes: '++id, projectId, parentId, type, name, updatedAt, deletedAt',
+      documents: '++id, name, updatedAt'
+    });
+    // v4: favorites (unindexed boolean — IndexedDB keys can't be boolean).
+    // Existing rows get isFavorite=undefined (not starred).
+    this.version(4).stores({
       projects: '++id, name, updatedAt',
       nodes: '++id, projectId, parentId, type, name, updatedAt, deletedAt',
       documents: '++id, name, updatedAt'

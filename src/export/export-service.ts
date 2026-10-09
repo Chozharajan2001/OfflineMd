@@ -1,4 +1,5 @@
 import type { ExportFormat, ExportInput, ExportResult, IExporter } from './types';
+import { getFrontMatter } from './utils/front-matter';
 
 export class ExportOrchestrator {
   static async export(format: ExportFormat, input: ExportInput): Promise<ExportResult> {
@@ -7,9 +8,17 @@ export class ExportOrchestrator {
       if (!format || typeof format !== 'string') {
         throw new Error('Invalid export format');
       }
-      
+
+      // Front matter is metadata, not body — strip once so every exporter agrees.
+      // Keep its title for filenames when no explicit metadata title exists.
+      const { content, data } = getFrontMatter(input.markdown);
+      const metadata =
+        input.metadata?.title || typeof data.title !== 'string'
+          ? input.metadata
+          : { ...input.metadata, title: data.title };
+
       const exporter = await this.getExporter(format);
-      return await exporter.export(input);
+      return await exporter.export({ ...input, markdown: content, metadata });
     } catch (error) {
       console.error(`Export orchestrator failed for format: ${format}`, error);
       throw new Error(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

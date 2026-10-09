@@ -7,6 +7,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeSlug from 'rehype-slug';
 import rehypeSanitize from 'rehype-sanitize';
+import { getFrontMatter } from '../../src/export/utils/front-matter';
 import rehypeHighlight from 'rehype-highlight';
 import { visit } from 'unist-util-visit';
 import type { Root as HastRoot } from 'hast';
@@ -84,9 +85,12 @@ class MarkdownParser {
   async parse(markdown: string): Promise<string> {
     try {
       if (!markdown) return '';
-      
+
+      // Strip YAML front matter so it never renders as body text
+      const { content } = getFrontMatter(markdown);
+
       // The core fix: await the process
-      const vfile = await this.processor.process(markdown);
+      const vfile = await this.processor.process(content);
       
       // Return the string content
       return String(vfile);

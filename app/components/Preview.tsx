@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify';
 import { useMarkdownStore } from '../store';
 import { markdownParser } from '../services/MarkdownParser';
 import { safeFontFamily, safeHex } from '../../src/export/utils/theme-validation';
+import { getFrontMatter } from '../../src/export/utils/front-matter';
 
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
     if (node.tagName === 'A' && node.getAttribute('target') === '_blank') {
@@ -335,6 +336,8 @@ export function Preview() {
 
     // Render parsed markdown with rich inline styles
     // Note: Content is sanitized twice (MarkdownParser + DOMPurify) for XSS protection
+    const frontMatter = getFrontMatter(markdown).data;
+    const metaLine = [frontMatter.author, frontMatter.date].filter(Boolean).join(' · ');
     return (
         <div
             ref={previewRef}
@@ -350,6 +353,12 @@ export function Preview() {
             }}
         >
             <style>{proseStyles}</style>
+            {frontMatter.title && (
+                <div className="preview-content mb-2 text-sm opacity-70" aria-label="Document metadata">
+                    {String(frontMatter.title)}
+                    {metaLine ? ` — ${metaLine}` : ''}
+                </div>
+            )}
             <div
                 className="preview-content"
                 dangerouslySetInnerHTML={{ __html: renderedHtml }}

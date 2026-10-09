@@ -4,7 +4,7 @@ import { themeToCSS } from '../utils/theme-to-css';
 import { sanitizeHTML } from '../utils/sanitizer';
 import { highlightThemeCSS } from '../utils/highlight-theme';
 import { extractTitle, safeFilename } from '../utils/safe-filename';
-import { extractToc } from '../../../app/components/TableOfContents';
+import { extractToc } from '../utils/toc';
 
 export class HtmlExporter implements IExporter {
     format: ExportFormat = 'html';

@@ -95,7 +95,10 @@ We can destroy a document with one click today. The competitor cannot.
   `includeTableOfContents`, `syntaxHighlight` and `headerFooter` are in `src/export/types.ts`
   and the dialog defaults, but **no exporter reads them**. Either implement or delete them
   (audit M-12).
-- [ ] **YAML front matter** (gap A15) — parse and display metadata; their bundle uses `js-yaml`.
+- [x] **YAML front matter** (gap A15) — DONE 2026-10-09: `gray-matter` util
+  (`src/export/utils/front-matter.ts`, never throws); stripped in `MarkdownParser.parse` and once
+  in `ExportOrchestrator` (all exporters agree); title/author shown in Preview; fm title feeds
+  export filenames via `extractTitle`.
 - [x] **Copy Markdown to clipboard** (gap A12) — DONE 2026-10-09: header copy button with
   clipboard + toast (`Header.tsx`).
 - [ ] **PlantUML** (gap A6) — lower priority than math; needs a rendering service or a WASM build.

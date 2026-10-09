@@ -15,6 +15,7 @@ import { db } from '../services/Database';
 import { buildWorkspaceBackup, restoreWorkspaceBackup } from '../utils/backup';
 import { ConfirmDialog, InputDialog } from './dialogs';
 import { Button, IconButton } from './ui';
+import { PwaInstallButton, OfflineBadge } from './PwaInstall';
 import { useToast } from './notifications/useToast';
 
 export function Header() {
@@ -397,6 +398,7 @@ export function Header() {
                 <p className="text-lg sm:text-xl font-bold tracking-tight truncate">Markdown Converter</p>
             </div>
             <div className="flex gap-1 sm:gap-2 items-center shrink-0">
+                <OfflineBadge />
                 {/* Primary action */}
                 <Button
                     variant="primary"
@@ -581,13 +583,14 @@ export function Header() {
                     </DropdownMenu.Portal>
                 </DropdownMenu.Root>
 
+                <PwaInstallButton variant="icon" />
+
                 <Dialog.Root open={settingsOpen} onOpenChange={setSettingsOpen}>
                     <Dialog.Trigger asChild>
                         <IconButton label="Open settings">
                             <Settings className="w-5 h-5" />
                         </IconButton>
-                    </Dialog.Trigger>
-                    <Dialog.Portal>
+                    </Dialog.Trigger>                    <Dialog.Portal>
                         <Dialog.Overlay className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm" />
                         <Dialog.Content className="fixed top-1/2 left-1/2 z-[110] transform -translate-x-1/2 -translate-y-1/2 bg-[var(--background)] border border-[var(--header-border)] text-[var(--dialog-fg)] p-6 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-auto">
                             <Dialog.Title className="text-lg font-semibold mb-3">Settings</Dialog.Title>
@@ -669,6 +672,13 @@ export function Header() {
 
                             {settingsTab === 'workspace' && (
                             <div className="space-y-4">
+                                <div>
+                                    <h3 className="font-medium text-[var(--sidebar-muted)] text-sm uppercase tracking-wider mb-2">Install</h3>
+                                    <PwaInstallButton variant="full" />
+                                    <p className="mt-2 text-xs text-[var(--sidebar-muted)]">
+                                        Installs to your device for offline use — no browser needed. Already installed? The button hides itself.
+                                    </p>
+                                </div>
                                 <div className="rounded-lg border border-red-500/40 p-4">
                                     <h3 className="font-medium text-sm uppercase tracking-wider mb-2 text-red-500">Danger zone</h3>
                                     <div className="flex gap-2">

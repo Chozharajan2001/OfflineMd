@@ -50,6 +50,41 @@ export function Sidebar() {
     const [expandedFolders, setExpandedFolders] = useState<Record<number, boolean>>({});
     const [isMobileOpen, setIsMobileOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const ensuredProject = useRef(false);
+
+    // No project-first awkwardness: guarantee a usable project on boot.
+    // Fresh install → auto-create "My Notes" and select it, so New File /
+    // Save / import work immediately. Returning user with nothing selected →
+    // resume the most recently updated project. Guarded against StrictMode
+    // double-effects creating duplicates.
+    useEffect(() => {
+        if (ensuredProject.current) return;
+        ensuredProject.current = true;
+        void (async () => {
+            try {
+                const count = await db.projects.count();
+                if (count === 0) {
+                    const now = new Date();
+                    const id = await db.projects.add({ name: 'My Notes', createdAt: now, updatedAt: now });
+                    // Re-check: a concurrent mount may have created one already
+                    if ((await db.projects.count()) > 1) {
+                        await db.projects.delete(id as number);
+                        const first = await db.projects.orderBy('updatedAt').last();
+                        if (first?.id) setActiveProject(first.id);
+                        return;
+                    }
+                    setActiveProject(id as number);
+                    toast.info('Created “My Notes” — add a file to start writing.');
+                } else if (!useMarkdownStore.getState().activeProjectId) {
+                    const latest = await db.projects.orderBy('updatedAt').last();
+                    if (latest?.id) setActiveProject(latest.id);
+                }
+            } catch {
+                // IndexedDB unavailable (private mode quota, etc.) — app still
+                // works unsaved; header save/import paths already handle null.
+            }
+        })();
+    }, [setActiveProject, toast]);
 
     // Dialog states
     const [openCreateProject, setOpenCreateProject] = useState(false);

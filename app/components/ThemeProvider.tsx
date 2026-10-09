@@ -51,6 +51,33 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         // Shared state + scrim tokens consumed by the utilities in tailwind's theme
         root.style.setProperty('--ui-hover-bg', state(0.08));
         root.style.setProperty('--ui-active-bg', state(0.14));
+
+        // Elevation scale (0.1): stepped surfaces so dropdowns/dialogs/toasts read
+        // as raised instead of same-fill + shadow. Steps mix toward foreground.
+        const mix = (hex: string, target: string, t: number): string => {
+            const nums = (h: string): [number, number, number] => {
+                const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(h.trim());
+                return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
+            };
+            const [a, b] = [nums(hex), nums(target)];
+            const mixed = a.map((c, i) => Math.round(c + (b[i] - c) * t));
+            return `#${mixed.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+        };
+        const surface = (t: number) => mix(theme.ui.background, theme.ui.foreground, t);
+        root.style.setProperty('--surface-1', surface(0.04));
+        root.style.setProperty('--surface-2', surface(0.08));
+        root.style.setProperty('--surface-3', surface(0.14));
+
+        // Semantic status colors — brighter on dark surfaces, deeper on light ones
+        const semantic: Record<string, [string, string]> = {
+            success: ['#4ade80', '#15803d'],
+            warning: ['#facc15', '#a16207'],
+            danger: ['#f87171', '#b91c1c'],
+            info: ['#60a5fa', '#1d4ed8'],
+        };
+        for (const [name, [dark, light]] of Object.entries(semantic)) {
+            root.style.setProperty(`--color-${name}`, isDark ? dark : light);
+        }
         root.style.setProperty('--overlay-bg', isDark ? 'rgba(0,0,0,0.6)' : 'rgba(9,9,11,0.45)');
         root.style.setProperty('--glass-bg', isDark ? 'rgba(24,24,27,0.85)' : 'rgba(255,255,255,0.85)');
         root.style.setProperty('--border-light', state(0.08));
@@ -71,13 +98,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         root.style.setProperty('--sidebar-input-bg', theme.ui.border);
         root.style.setProperty('--sidebar-hover', state(0.05));
 
-        // Dropdown/Dialog Specific
-        root.style.setProperty('--dropdown-bg', theme.ui.background);
+        // Dropdown/Dialog Specific (raised surfaces, not page fill)
+        root.style.setProperty('--dropdown-bg', 'var(--surface-2)');
         root.style.setProperty('--dropdown-fg', theme.ui.foreground);
         root.style.setProperty('--dropdown-border', theme.ui.border);
         root.style.setProperty('--dropdown-hover', state(0.1));
 
-        root.style.setProperty('--dialog-bg', theme.ui.background);
+        root.style.setProperty('--dialog-bg', 'var(--surface-2)');
         root.style.setProperty('--dialog-fg', theme.ui.foreground);
         root.style.setProperty('--dialog-border', theme.ui.border);
 

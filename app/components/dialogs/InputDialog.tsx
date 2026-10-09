@@ -93,18 +93,16 @@ export function InputDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50" />
         <Dialog.Content
-          aria-describedby={description ? descriptionId : undefined}
+          aria-describedby={descriptionId}
           className="fixed top-1/2 left-1/2 w-[360px] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 rounded border border-[var(--dialog-border)] bg-[var(--dialog-bg)] p-4 text-[var(--dialog-fg)] shadow-xl z-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
         >
           <Dialog.Title className="text-base font-semibold">
             {title}
           </Dialog.Title>
           
-          {description ? (
-            <Dialog.Description id={descriptionId} className="mt-1 text-sm text-[var(--sidebar-muted)]">
-              {description}
-            </Dialog.Description>
-          ) : null}
+          <Dialog.Description id={descriptionId} className={description ? "mt-1 text-sm text-[var(--sidebar-muted)]" : "sr-only"}>
+            {description || `${title} dialog`}
+          </Dialog.Description>
 
           <div className="mt-4">
             <label htmlFor={inputId} className="sr-only">

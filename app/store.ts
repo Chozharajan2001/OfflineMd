@@ -41,7 +41,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#09090b',
             foreground: '#e4e4e7',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -62,7 +62,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#ffffff',
             foreground: '#09090b',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -83,7 +83,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#282a36',
             foreground: '#f8f8f2',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -104,7 +104,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#ffffff',
             foreground: '#24292e',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -125,7 +125,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#0d1117',
             foreground: '#c9d1d9',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -146,7 +146,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#2e3440',
             foreground: '#eceff4',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -167,7 +167,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#282c34',
             foreground: '#abb2bf',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -188,7 +188,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#1a1b26',
             foreground: '#a9b1d6',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -209,7 +209,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#fdf6e3',
             foreground: '#657b83',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -230,7 +230,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#002b36',
             foreground: '#839496',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -251,7 +251,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#2d2a2e',
             foreground: '#fcfcfa',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -272,7 +272,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#282828',
             foreground: '#ebdbb2',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -293,7 +293,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#ffffff',
             foreground: '#37352f',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -314,7 +314,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#1e1e2e',
             foreground: '#cdd6f4',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -335,7 +335,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#f4ecd8',
             foreground: '#5b4636',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -356,7 +356,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#1b2a1b',
             foreground: '#b8d4b8',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },
@@ -377,7 +377,7 @@ export const themes: Record<string, ThemeConfig> = {
         preview: {
             background: '#0b1929',
             foreground: '#b3c5d7',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'var(--font-inter), Inter, system-ui, sans-serif',
             fontSize: 16,
         },
     },

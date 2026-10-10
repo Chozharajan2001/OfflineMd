@@ -13,6 +13,9 @@ export class MarkdownExporter implements IExporter {
 
     async export({ markdown, metadata }: ExportInput): Promise<ExportResult> {
         const start = performance.now();
+        if (!markdown || typeof markdown !== 'string') {
+            throw new Error('Invalid markdown content');
+        }
         const blob = new Blob([markdown], { type: this.mimeType });
         const base = (metadata?.title || 'document')
             .replace(/[\\/:*?"<>|]/g, '_')

@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# E2E (npm run test:e2e) stays manual/nightly: it needs a running
+# server + system Chrome. Unit tests run here on every push.
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: |
+          npm ci
+          npx tsc --noEmit
+          npx eslint .
+          npm test
+          npm run build

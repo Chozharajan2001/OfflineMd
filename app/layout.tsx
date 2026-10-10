@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import 'highlight.js/styles/github-dark.css';
 import 'katex/dist/katex.min.css';
@@ -14,6 +14,12 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
     variable: "--font-geist-mono",
+    subsets: ["latin"],
+});
+
+// Preview default stack is Inter: load it so all 17 presets render as designed
+const inter = Inter({
+    variable: "--font-inter",
     subsets: ["latin"],
 });
 
@@ -49,7 +55,7 @@ export default function RootLayout({
                 <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
             </head>
             <body
-                className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+                className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased`}
             >
                 <ThemeProvider>
                     {children}

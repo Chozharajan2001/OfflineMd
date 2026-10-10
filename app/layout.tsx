@@ -27,6 +27,16 @@ export const metadata: Metadata = {
     title: "Markdown Converter",
     description: "A powerful markdown editor and converter with offline support",
     manifest: "/manifest.json",
+    openGraph: {
+        title: "Markdown Converter",
+        description: "Privacy-first offline markdown editor and converter",
+        type: "website",
+    },
+    twitter: {
+        card: "summary",
+        title: "Markdown Converter",
+        description: "Privacy-first offline markdown editor and converter",
+    },
     appleWebApp: {
         capable: true,
         statusBarStyle: "black-translucent",

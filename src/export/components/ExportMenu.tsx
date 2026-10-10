@@ -1,6 +1,6 @@
 import React from 'react';
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Download, FileText, FileType, FileCode, FileStack, FileSymlink, FileImage, Presentation, Check } from "lucide-react";
+import { Download, FileText, FileType, FileCode, FileStack, FileSymlink, FileImage, Presentation, Check, BookOpen } from "lucide-react";
 import type { ExportFormat } from "../types";
 import { IconButton } from '../../../app/components/ui';
 
@@ -22,6 +22,7 @@ export function ExportMenu({ onSelect, shortcutLabel, trigger, activeFormat }: E
         { format: "docx", label: "DOCX (.docx)", hint: "Word document", icon: <FileSymlink size={14} /> },
         { format: "pptx", label: "PPTX (.pptx)", hint: "Slide deck", icon: <Presentation size={14} /> },
         { format: "png", label: "PNG (.png)", hint: "Image snapshot", icon: <FileImage size={14} /> },
+        { format: "epub", label: "EPUB (.epub)", hint: "E-book", icon: <BookOpen size={14} /> },
     ];
 
     return (

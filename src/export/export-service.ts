@@ -42,6 +42,8 @@ export class ExportOrchestrator {
           return new (await import('./exporters/pptx-exporter')).PptxExporter();
         case 'png':
           return new (await import('./exporters/png-exporter')).PngExporter();
+        case 'epub':
+          return new (await import('./exporters/epub-exporter')).EpubExporter();
         default:
           throw new Error('Unsupported export format: ' + format);
       }

@@ -33,6 +33,7 @@ const EXTENSIONS: Record<ExportFormat, string> = {
     docx: '.docx',
     pptx: '.pptx',
     png: '.png',
+    epub: '.epub',
 };
 
 export function ExportOptionsDialog({

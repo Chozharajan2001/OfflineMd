@@ -3,7 +3,7 @@
 /**
  * Supported export formats.
  */
-export type ExportFormat = 'md' | 'txt' | 'html' | 'pdf' | 'docx' | 'pptx' | 'png';
+export type ExportFormat = 'md' | 'txt' | 'html' | 'pdf' | 'docx' | 'pptx' | 'png' | 'epub';
 
 /**
  * Theme token definitions used for styling exports.

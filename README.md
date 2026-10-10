@@ -3,9 +3,8 @@
 A powerful, privacy-first markdown editor with live preview, project management, and multi-format
 export capabilities. Built with Next.js and React.
 
-> **Offline note:** documents are stored locally in IndexedDB, but the PWA service worker is not
-> registered today, so "works completely offline" is a goal rather than a fact. See
-> [docs/FUTURE_FEATURES.md](./docs/FUTURE_FEATURES.md).
+> **Offline note (2026-10-10):** Serwist service worker caches the app shell in production
+> builds; documents live in IndexedDB. Monaco Editor still loads from CDN (see TODO.md M6).
 
 ## Core Identity
 
@@ -18,7 +17,7 @@ export capabilities. Built with Next.js and React.
 ### Privacy & Offline
 - 100% client-side storage using IndexedDB (via Dexie.js)
 - No backend data service - all data stays on your device
-- ⚠️ Offline/PWA mode is not wired up yet (service worker never registered)
+- ✅ App shell cached offline in production (Serwist); Monaco Editor still CDN-loaded
 - No account required, no data collection
 
 ### Editor Features
@@ -31,8 +30,9 @@ export capabilities. Built with Next.js and React.
 ### Organization System
 - **Projects** - Create multiple projects for different contexts
 - **Hierarchical folders** - Organize files with nested folder support
-- **File management** - Create, rename and delete files and folders (move/reparent is not implemented yet)
+- **File management** - Create, rename, move, trash/restore, delete (with undo toasts)
 - **Recent files** - Quick access to recently edited documents
+- **Favorites, content search, version history, command palette, autosave**
 
 ### Theming System
 - **17 Built-in Themes**: Dark, Light, Dracula, GitHub Light/Dark, Nord, One Dark Pro, Tokyo Night, Solarized Light/Dark, Monokai Pro, Gruvbox Dark, Notion, Obsidian, Sepia, Forest, Ocean
@@ -44,11 +44,13 @@ export capabilities. Built with Next.js and React.
 | Format | Status | Notes |
 |--------|--------|-------|
 | **Markdown (.md)** | Ready | Raw markdown export |
-| **HTML (.html)** | Ready | Self-contained with theme CSS |
+| **HTML (.html)** | Ready | Self-contained with theme CSS, optional TOC |
 | **Plain Text (.txt)** | Ready | Stripped markdown formatting |
-| **PDF (.pdf)** | Ready | pdf-lib: multi-page, WinAnsi encoding, embedded PNG/JPG images |
+| **PDF (.pdf)** | Ready | pdf-lib: multi-page, WinAnsi encoding, embedded PNG/JPG images, configurable layout |
 | **Word (.docx)** | Ready | Headings, lists, blockquotes, tables and inline formatting (not raw text) |
 | **PowerPoint (.pptx)** | Ready | `pptxgenjs`, one slide per section with title and body text |
+| **PNG (.png)** | Ready | Themed 2x image snapshot |
+| **EPUB (.epub)** | Ready | Minimal EPUB 3 e-book |
 | **Project archive (.zip)** | Ready | Whole project tree as folder structure, from the sidebar |
 
 ---
@@ -71,8 +73,7 @@ export capabilities. Built with Next.js and React.
   - file-saver (Downloads)
 - **UI Components**: Radix UI primitives (Dialog, Dropdown Menu, Tabs, Tooltip)
 - **Icons**: Lucide React
-- **PWA**: `next-pwa` is a dependency but is **not yet wired** — `next.config.ts` does not apply
-  `withPWA` and nothing registers the service worker, so full-offline mode is still a TODO
+- **PWA**: `@serwist/next` service worker + install button + offline badge + manifest shortcuts
 
 ---
 
@@ -122,10 +123,8 @@ markdown-converter/
 │   │   ├── ResizableLayout.tsx  # Split-pane layout
 │   │   └── ThemeProvider.tsx    # Theme synchronization
 │   ├── services/                # Business logic
-│   │   ├── Database.ts          # Dexie.js IndexedDB schema
-│   │   ├── MarkdownParser.ts    # Unified.js processor
-│   │   ├── ThemeAdapter.ts      # Unused — theming actually lives in ThemeProvider.tsx
-│   │   └── ExportService.ts     # Legacy html2pdf export (deprecated, imported by nothing)
+│   │   ├── Database.ts          # Dexie.js IndexedDB schema (v5: projects/nodes/revisions)
+│   │   └── MarkdownParser.ts    # Unified.js processor (GFM, math, sanitize, highlight)
 │   ├── store.ts                 # Zustand state management + 17 theme presets
 │   ├── layout.tsx               # Root layout; links the web-app manifest (no service worker)
 │   ├── page.tsx                 # Main page

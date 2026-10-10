@@ -17,8 +17,9 @@ files the audit fixes already touched.
 2. `npx eslint .` clean — **0 errors / 0 warnings** since 2026-10-09 (was 5/90 baseline;
    generated `public/sw.js` is now eslint-ignored, last source error fixed via
    `useSyncExternalStore` in `ThemeProvider.tsx`).
-3. The behaviour is checked in a real browser, not inferred from code. There is **no test suite**
-   in this repo, so the browser check is the only functional gate.
+3. The behaviour is checked in a real browser, not inferred from code. Automated gates:
+   34 vitest unit tests (`npm test`), Playwright smoke (`npm run test:e2e`), CI workflow
+   (tsc + eslint + test + build on push) — browser check remains the final functional gate.
 4. If it fixes a documented claim, the docs in `docs/` and the root README are updated too.
 
 ---
@@ -51,14 +52,12 @@ The app is sold as offline and is not. This is the highest-value block.
     `minSize={20}`), so at 320 px each pane is ~140 px and text wraps to one word per line.
   - Add a `viewMode` state to `app/store.ts`, three header buttons, and default to `editor`
     below `md`. The competitor ships exactly these three modes.
-- [ ] **Fix light-mode surface separation** (audit V-3)
-  - In Light, editor and preview are both `#ffffff` with no border; the only divider is the 8 px
-    separator, which reads as a heavy grey slab. Add a `--surface-2` token and a 1 px divider with
-    a wider invisible hit area.
-- [ ] **Mobile sidebar stacking + focus containment** (audit V-4, m-15)
-  - Sidebar is `z-50` while `header` is `z-index: auto`, so the panel covers the header row.
-  - When collapsed it uses `lg:-translate-x-full lg:w-0`, not `inert`/`aria-hidden`, so its
-    controls may stay in the tab order. Verify at ≥1024 px and add `inert`.
+- [x] **Fix light-mode surface separation** (audit V-3) — MOSTLY DONE: `--surface-1/2/3`
+  stepped tokens exist and dropdowns/dialogs/toasts sit on raised surfaces. The divider itself
+  is still an 8px visual (with a wider invisible hit area) rather than 1px — open if that matters.
+- [x] **Mobile sidebar stacking + focus containment** (audit V-4, m-15) — DONE: collapsed sidebar
+  carries `inert` + `aria-hidden`; overlay covers the header by design on small screens (close
+  button no longer collides with the Projects `+` — 48px reserved).
 
 ## M2 — Data safety
 
@@ -98,10 +97,11 @@ We can destroy a document with one click today. The competitor cannot.
 - [x] **Import from GitHub / URL** (gap A10) — DONE 2026-10-09: Import-from-URL dialog in `Header.tsx`
   (https-only, 15s timeout, content-type guard, 2MB cap, reuses save-confirm flow; works with
   GitHub raw links).
-- [ ] **In-app table of contents** (gap A14) — plus make the export honour it:
-  `includeTableOfContents`, `syntaxHighlight` and `headerFooter` are in `src/export/types.ts`
-  and the dialog defaults, but **no exporter reads them**. Either implement or delete them
-  (audit M-12).
+- [x] **In-app table of contents** (gap A14) — DONE: `TableOfContents.tsx` sidebar list
+  (github-slugger mirror, code-fence/front-matter safe), click-to-scroll via `toc-navigate`
+  with `:target` flash; HTML exporter honors `includeTableOfContents` with a `<nav>` block
+  (dialog checkbox gated on HTML). `syntaxHighlight`/`headerFooter` were deleted as dead
+  (nothing ever read them); every remaining option is rendered AND read.
 - [x] **YAML front matter** (gap A15) — DONE 2026-10-09: `gray-matter` util
   (`src/export/utils/front-matter.ts`, never throws); stripped in `MarkdownParser.parse` and once
   in `ExportOrchestrator` (all exporters agree); title/author shown in Preview; fm title feeds
@@ -119,7 +119,7 @@ We can destroy a document with one click today. The competitor cannot.
 
 ## M4 — Accessibility debt (audit M-7 … M-11, m-13 … m-17)
 
-`axe-core` reported 6 violations; 1 is fixed (viewport). Remaining, roughly in order of harm:
+`axe-core` reported 6 violations; all resolved. Remaining polish below (spacing tokens, skeletons).
 
 - [x] **Touch targets to 44 px** (M-4) — DONE 2026-10-09 with a documented split: header
   controls 44px and dialog buttons 40px via `globals.css`; panel separator keeps its 8px visual
@@ -130,61 +130,35 @@ We can destroy a document with one click today. The competitor cannot.
   (`accentTextFor()` in `theme-validation.ts`: keeps accent when ≥4.5:1, else mixes toward
   foreground) applied to links/strong/markers/inline-code in `Preview.tsx` and `theme-to-css.ts`
   (large headings keep `--accent`, which passes 3:1).
-- [ ] **Landmarks and skip link** (M-7) — no `<main>`, `<nav>` or `<aside>`; 5 regions orphaned;
-  no skip link. `app/page.tsx` and `Sidebar.tsx`.
-- [ ] **Keyboard access to scroll regions** (M-7) — the file tree and preview scroll but cannot
-  take focus; add `tabIndex={0}` + `role="region"` + label.
-- [ ] **Import reachable by keyboard** (M-8) — `input type="file"` is `display:none`; use
-  `sr-only` and a `htmlFor` label.
-- [ ] **Dialog form semantics** (M-10) — inputs are labelled by placeholder only; errors have no
-  `role="alert"`, no `aria-invalid`, no `aria-describedby`, and use `text-red-400` (≈3.0:1 on
-  white). `InputDialog.tsx`, `ConfirmDialog.tsx`, `ExportOptionsDialog.tsx`.
-- [x] **One `<h1>` per view** (M-9) — DONE 2026-10-09: brand heading in `Header.tsx` demoted to
-  `<p>` (same styling), leaving the document's own `<h1>` as the single one.
-- [ ] **`prefers-reduced-motion`** (M-15) — zero occurrences in the shipped stylesheet.
-- [ ] **Toast timing** (m-20/m-21) — auto-dismiss cannot be paused on hover/focus; no exit
-  animation; container has `aria-label` on a role-less `div` (axe `aria-prohibited-attr`);
-  the card and container both announce, so screen readers say it twice.
-- [x] **Unlabelled `×` close buttons** (m-13) — VERIFIED 2026-10-09: `ConfirmDialog.tsx` and
-  Settings carry `aria-label`; `ExportOptionsDialog.tsx` has no `×` (Cancel only). No change needed.
-- [x] **`aria-allowed-attr` on the panel group** (M-7.1) — DONE 2026-10-09: the library hardcodes
-  `aria-orientation` on `role="group"` (verified in dist); `ResizableLayout.tsx` strips it post-mount
-  via `elementRef` and labels the group.
-- [x] **Toast timing** (m-20/m-21) — DONE 2026-10-09: container `aria-live` removed (each Toast's
-  `role="status"` announces once — no double-announce); pause-on-hover/focus already shipped.
-- [ ] **Font-size input can be set to NaN** (M-11) — `parseInt` on an empty field; add
-  `min`/`max`/`step` and clamp.
-- [ ] **`.md`/`.txt` export opens an empty dialog** (M-12) — every option is gated on
-  html/pdf/docx/pptx, so the dialog has no body. Export directly for those two formats.
+- [x] **Landmarks and skip link** (M-7) — DONE: `<main>`, `<aside>`, labelled `<nav>`/regions, skip link in `page.tsx`.
+- [x] **Keyboard access to scroll regions** (M-7) — DONE: `tabIndex={0}` + `role="region"` + labels on tree/preview/TOC/trash; separator resizes via arrow keys.
+- [x] **Import reachable by keyboard** (M-8) — DONE: `sr-only` inputs with `htmlFor` labels.
+- [x] **Dialog form semantics** (M-10) — DONE: labelled inputs, `role="alert"`/`aria-invalid`/`aria-describedby`, unconditional `Description`, contrast-fixed error color.
+- [x] **`prefers-reduced-motion`** (M-15) — DONE: global guard in `globals.css` + motion-safe TOC flash.
+- [x] **One `<h1>` per view** (M-9) — DONE: brand heading demoted to `<p>`, document keeps its `<h1>`.
+- [x] **Toast timing** (m-20/m-21) — DONE: pause-on-hover/focus, exit animation, container `aria-live`
+  removed (single announce via `role="status"`); unconditional `Description` (zero Radix warnings).
+- [x] **Unlabelled `×` close buttons** (m-13) — VERIFIED: all carry `aria-label`; `ExportOptionsDialog` has no `×` (Cancel only).
+- [x] **`aria-allowed-attr` on the panel group** (M-7.1) — DONE: library-hardcoded `aria-orientation` stripped post-mount via `elementRef`, group labelled.
+- [x] **Font-size input can be set to NaN** (M-11) — DONE: `min`/`max`/`step` + clamp (header + export dialog).
+- [x] **`.md`/`.txt` export opens an empty dialog** (M-12) — DONE: direct export, dialog bypassed.
 
 ## M5 — Design-system and visual debt
 
 - [x] **Delete `tailwind.config.ts` or make it load** (M-1) — DONE 2026-10-09: deleted (Tailwind v4
   is CSS-first; nothing referenced it) — verified `tsc` + build pass without it.
-- [x] **Apply the fonts that are already loaded** (M-2) — MOSTLY DONE 2026-10-09: `body` uses
-  Geist vars (`globals.css`). Preview's `Inter` is still not loaded (falls back to system
-  sans) — open: either load Inter or change the default stack.
-- [ ] **Apply the fonts that are already loaded** (M-2) — `body` is
-  `Arial, Helvetica, sans-serif` while Geist is loaded and unused; the preview requests
-  `Inter`, which is never loaded.
-- [ ] **Preview measure cap** (m-6) — `.preview-content` has `max-width: none`, so lines run to
-  ~95 characters at 1920 px. Target 65–75ch.
-- [ ] **Semantic colour tokens** (m-1) — ~12 hardcoded palette classes (`bg-green-900/90`,
-  `text-red-500`, `bg-black/50`, …) bypass the theme. Add `--color-success/-warning/-danger/-info`.
-- [ ] **Elevation scale** (m-2, m-24) — z-index values are 4, 5, 40, 50, 100, 110 and −10;
-  `--header-bg`, `--sidebar-bg`, `--dropdown-bg`, `--dialog-bg` and `--background` are all the
-  same colour, so nothing reads as raised.
-- [ ] **Spacing and radius consistency** (m-3, m-10) — dialogs use `p-4 rounded` vs `p-6
-  rounded-lg`; radii in the shipped CSS are `0`, `.25rem`, `2px`, `var(--radius-lg)` and
-  `3.4e38px`.
-- [ ] **Empty states with a call to action** (m-20) — "No recent files", "No matching files or
-  folders", "Select a project to view files" are bare italic text.
-- [ ] **Primary action emphasis** (m-21) — all six header controls are identical icon buttons.
-- [ ] **Skeleton screens** (m-18) — replace "Loading editor…" / "Loading preview…" text;
-  `ThemeProvider` also blocks all children for one frame after mount.
-- [ ] **Context menu viewport clamping** (m-16) — positioned at raw click coordinates.
-- [ ] **URL state / deep links** (m-17) — selected project and file live only in the store, so a
-  reload or a shared link cannot reopen a document.
+- [x] **Apply the fonts that are already loaded** (M-2) — DONE 2026-10-10: Inter loaded via
+  `next/font` and wired into all 17 preset stacks + body; Geist vars already applied.
+- [x] **Preview measure cap** (m-6) — DONE: 75ch cap in `globals.css` (+ responsive preview padding).
+- [x] **Semantic colour tokens** (m-1) — DONE: `--color-success/-warning/-danger/-info` (theme-aware); toasts/dialogs use them.
+- [x] **Elevation scale** (m-2, m-24) — DONE: `--surface-1/2/3` stepped tokens; dropdowns/dialogs/toasts sit on raised surfaces.
+- [ ] **Spacing and radius consistency** (m-3, m-10) — OPEN: dialogs still mix `p-4 rounded` vs `p-6
+  rounded-lg`; radii vary across shipped CSS. Needs a spacing/radius token pass.
+- [x] **Empty states with a call to action** (m-20) — DONE: guided preview card, New-project/Clear-search CTAs. Bare italic remains only for trivial lists (recents/favorites/TOC-empty).
+- [x] **Primary action emphasis** (m-21) — DONE: Save primary + export split-button + overflow menu regroup.
+- [ ] **Skeleton screens** (m-18) — OPEN: "Loading editor…" text remains; `ThemeProvider` still gates children one frame.
+- [x] **Context menu viewport clamping** (m-16) — DONE: clamped to viewport with margin.
+- [x] **URL state / deep links** (m-17) — DONE: `?new=file` shortcut + store-driven `pendingDeepLink` (race-free); manifest shortcut registered.
 - [x] **Dead code removal** (M-14) — DONE 2026-10-09: deleted `app/services/ExportService.ts`,
   `app/services/ThemeAdapter.ts`, `types/next-pwa.d.ts`, `tailwind.config.ts`, stale
   `public/sw.js`/`workbox-*` (generated SW now git-ignored); uninstalled `html2pdf.js`,

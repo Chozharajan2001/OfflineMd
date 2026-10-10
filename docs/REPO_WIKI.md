@@ -42,7 +42,7 @@ Complete documentation and knowledge base for the Markdown Editor & Converter pr
 - **React**: 19.2.3
 - **Language**: TypeScript 5
 - **Themes**: 17 built-in themes (12 dark, 5 light)
-- **Export Formats**: 6 formats (Markdown, HTML, Plain Text, PDF, DOCX, PPTX)
+- **Export Formats**: 8 formats (Markdown, HTML, Plain Text, PDF, DOCX, PPTX, PNG, EPUB)
 
 ---
 
@@ -171,6 +171,7 @@ flowchart TD
         PlaintextExporter[PlaintextExporter]
         PptxExporter[PptxExporter]
         PngExporter[PngExporter]
+        EpubExporter[EpubExporter]
     end
 
     subgraph Storage_Layer[`Storage Layer`]
@@ -205,6 +206,8 @@ flowchart TD
     ExportOrchestrator -->|Select format| DocxExporter
     ExportOrchestrator -->|Select format| PlaintextExporter
     ExportOrchestrator -->|Select format| PptxExporter
+    ExportOrchestrator -->|Select format| PngExporter
+    ExportOrchestrator -->|Select format| EpubExporter
 
     %% Storage Flow
     Store -->|Save content| Database
@@ -326,6 +329,14 @@ classDiagram
         +export(input: ExportInput) Promise~ExportResult~
     }
     
+    class PngExporter {
+        +export(input: ExportInput) Promise~ExportResult~
+    }
+    
+    class EpubExporter {
+        +export(input: ExportInput) Promise~ExportResult~
+    }
+    
     %% Export UI Components
     class ExportMenu {
         +onSelect(format: ExportFormat) void
@@ -374,6 +385,8 @@ classDiagram
     DocxExporter ..|> IExporter : implements
     PlaintextExporter ..|> IExporter : implements
     PptxExporter ..|> IExporter : implements
+    PngExporter ..|> IExporter : implements
+    EpubExporter ..|> IExporter : implements
     
     MarkdownDB --> MarkdownStore : persists state
     
@@ -485,13 +498,10 @@ sequenceDiagram
 │  │  └───────────────┘  │  │  │  │ ExportOrchestrator │  │ │ │
 │  └─────────────────────┘  │  │  │  └────────────────────┘  │ │ │
 │                           │  │  │  ┌────────────────────┐  │ │ │
-│                           │  │  │  │ Exporters (6)      │  │ │ │
-│                           │  │  │  │ • markdown         │  │ │ │
-│                           │  │  │  │ • html             │  │ │ │
-│                           │  │  │  │ • pdf              │  │ │ │
-│                           │  │  │  │ • docx             │  │ │ │
-│                           │  │  │  │ • plaintext        │  │ │ │
-│                           │  │  │  │ • pptx             │  │ │ │
+│                           │  │  │  │ Exporters (8)      │  │ │ │
+│                           │  │  │  │ • md/txt/html      │  │ │ │
+│                           │  │  │  │ • pdf/docx/pptx     │  │ │ │
+│                           │  │  │  │ • png/epub         │  │ │ │
 │                           │  │  │  └────────────────────┘  │ │ │
 │                           │  │  └──────────────────────────┘  │ │
 │                           │  └────────────────────────────────┘ │
@@ -670,16 +680,14 @@ User Action (Create/Delete/Load)
 ### Main Components Directory: `app/components/`
 
 #### 1. **Editor** ([`Editor.tsx`](app/components/Editor.tsx))
-- **Lines**: 46
 - **Type**: Client Component ('use client')
 - **Purpose**: Monaco Editor integration for markdown editing
 - **Key Features**:
-  - SSR-safe hydration handling
-  - Theme-responsive font sizing
-  - Markdown language mode
-  - Font ligatures enabled
-  - Word wrap, minimap disabled
-- **Dependencies**: `@monaco-editor/react`, `useMarkdownStore`
+  - SSR-safe hydration handling + autosave (2.5s idle, revision-guarded)
+  - Theme-responsive font sizing; `custom-theme` defined by ThemeProvider
+  - Single status surface (state dot + stats in the status bar)
+  - Markdown language mode, ligatures, word wrap, minimap disabled
+- **Dependencies**: `@monaco-editor/react`, `useMarkdownStore`, `db` (autosave)
 
 ```typescript
 // Key implementation details
@@ -692,175 +700,130 @@ useEffect(() => { setIsClient(true); }, []);
   wordWrap: 'on',
   automaticLayout: true,
   fontSize: theme.editor.fontSize,
-  scrollBeyondLastLine: false,
-  padding: { top: 16, bottom: 16 },
+  theme: "custom-theme", // luminance-based base, set by ThemeProvider
   fontFamily: "'Fira Code', 'Cascadia Code', Consolas, monospace",
   fontLigatures: true,
 }
 ```
 
 #### 2. **Preview** ([`Preview.tsx`](app/components/Preview.tsx))
-- **Lines**: 256
 - **Type**: Client Component
-- **Purpose**: Live markdown preview with syntax highlighting and Mermaid diagrams
+- **Purpose**: Live markdown preview with syntax highlighting, KaTeX math and Mermaid diagrams
 - **Key Features**:
-  - Debounced parsing (150ms delay)
-  - Mermaid diagram rendering
-  - Theme-aware inline styles
-  - XSS-safe HTML rendering
-- **Dependencies**: `markdownParser`, `mermaid`, `useMarkdownStore`
+  - Debounced parsing (150ms) with race-token guard + double sanitization
+  - Mermaid rendering (scoped to preview, `securityLevel: 'strict'`)
+  - Front-matter badge, guided empty-state card, preview-local toolbar
+  - `toc-navigate` jumps, theme-aware inline styles, XSS-safe HTML rendering
+- **Dependencies**: `markdownParser`, `mermaid` (lazy), `useMarkdownStore`
 
 ```typescript
-// Debounced parsing
-const debouncedParse = useRef(
-  debounce(async (md: string) => {
-    const html = await markdownParser.parse(md);
-    setRenderedHtml(html);
-  }, 150)
-);
+// Debounced parsing with stale-parse guard (see source for full pipeline)
+const html = await markdownParser.parse(md);
+const safeHtml = DOMPurify.sanitize(html, { /* strict allowlist */ });
 
-// Mermaid rendering
-useEffect(() => {
-  const mermaidNodes = document.querySelectorAll('.language-mermaid');
-  if (mermaidNodes.length > 0) {
-    mermaid.run({ nodes: Array.from(mermaidNodes) });
-  }
-}, [renderedHtml, isClient]);
+// Mermaid rendering — scoped, never document-wide
+scope.querySelectorAll('pre > code.language-mermaid').forEach((codeEl) => { /* … */ });
 ```
 
 #### 3. **Sidebar** ([`Sidebar.tsx`](app/components/Sidebar.tsx))
-- **Lines**: 202
 - **Type**: Client Component
-- **Purpose**: Project and file management with hierarchical navigation
+- **Purpose**: Projects, nested tree, name+content search, recents, favorites, contents, trash, move/history dialogs
 - **Key Features**:
-  - Project creation and selection
-  - Folder/file tree with nesting
-  - CRUD operations (Create, Read, Update, Delete)
-  - Recent files list
-  - Expandable/collapsible folders
+  - Project creation/selection (+ "My Notes" auto-bootstrap)
+  - Folder/file tree with nesting, context menu, undo toasts
+  - Content search with snippets + highlighting, favorites, trash footer
 - **Dependencies**: `db` (Dexie.js), `useLiveQuery`, `useMarkdownStore`
 
 ```typescript
-// Reactive database queries
+// Reactive database queries (single project query; tree/search/trash derive)
 const projects = useLiveQuery(() => db.projects.toArray()) || [];
-
-const NodeList = ({ parentId }: { parentId: number | null }) => {
-  const nodes = useLiveQuery(
-    () => activeProjectId
-      ? db.nodes.where({ projectId: activeProjectId, parentId }).toArray()
-      : []
-    , [activeProjectId, parentId]
-  ) || [];
-};
+const projectNodesResult = useLiveQuery(
+  () => (activeProjectId ? db.nodes.where('projectId').equals(activeProjectId).toArray() : []),
+  [activeProjectId]
+);
 ```
 
 #### 4. **Header** ([`Header.tsx`](app/components/Header.tsx))
-- **Lines**: 205
 - **Type**: Client Component
-- **Purpose**: Toolbar with file operations, export, and settings
+- **Purpose**: Save primary, export split-button, view modes, overflow menu, settings tabs
 - **Key Features**:
-  - Save/import operations
-  - Export menu (6 formats)
-  - Theme settings dialog
-  - Active file indicator
-  - Export progress indicator
+  - Revision-guarded save/import (toast feedback, history capture)
+  - Export menu (8 formats + hints + last-used) with cancellable progress
+  - Appearance (swatch radios) / Workspace (backup) settings tabs
+  - Shortcuts: save, export, new file/project, palette
 - **Dependencies**: `ExportOrchestrator`, `db`, `useMarkdownStore`
 
 ```typescript
-// Save logic
+// Save logic (revision-guarded, toast feedback — never alert())
 const handleSave = async () => {
+  if (isSaving) return;
   if (activeFileId) {
-    await db.nodes.update(activeFileId, {
-      content: markdown,
-      updatedAt: new Date()
-    });
+    /* guarded update + captureRevision + toast */
+  } else if (!activeProjectId) {
+    toast.error('Please select a project…');
   } else {
-    // Create new file logic
+    setOpenSaveAsDialog(true);
   }
 };
 
-// Export integration
-const handleExport = async (format: ExportFormat, options: ExportOptions) => {
-  const result = await ExportOrchestrator.export(format, {
-    markdown,
-    theme,
-    options,
-    metadata: {}
-  });
-  await triggerDownload(result.blob, result.filename);
-};
+// Export integration (run-token cancellation)
+const result = await ExportOrchestrator.export(format, {
+  markdown, theme, options,
+  metadata: await buildExportMetadata(),
+  onProgress: (p) => { if (exportRunId.current === runId) setExportProgress(p); },
+});
+await triggerDownload(result.blob, result.filename);
 ```
 
 #### 5. **ResizableLayout** ([`ResizableLayout.tsx`](app/components/ResizableLayout.tsx))
-- **Lines**: 7
 - **Type**: Client Component
-- **Purpose**: Split-pane layout for editor and preview
+- **Purpose**: Editor-only / split / preview modes (`viewMode`) + resizable split
 - **Key Features**:
-  - Horizontal split panels
-  - Draggable separator
+  - Conditional panes (single-pane default on small screens)
+  - Horizontal split panels with draggable separator
+  - Keyboard resize (arrows, imperative group handle), labeled separator
   - Minimum size constraints
 - **Dependencies**: `react-resizable-panels`
 
 #### 6. **ThemeProvider** ([`ThemeProvider.tsx`](app/components/ThemeProvider.tsx))
-- **Lines**: 57
 - **Type**: Client Component
-- **Purpose**: Synchronize theme across UI, Monaco Editor, and CSS variables
+- **Purpose**: Theme tokens (surfaces, semantics, `--accent-text`), Monaco sync, `theme-color` meta
 - **Key Features**:
-  - CSS custom properties injection
-  - Monaco theme definition
+  - CSS custom properties injection (luminance-derived, `useSyncExternalStore` mount)
+  - Monaco `custom-theme` definition (luminance-based base)
   - Hydration-safe mounting
   - Smooth transitions (150ms)
 - **Dependencies**: `useMonaco`, `useMarkdownStore`
 
 ```typescript
-// CSS variable injection
-useEffect(() => {
-  const root = document.documentElement;
-  root.style.setProperty('--background', theme.ui.background);
-  root.style.setProperty('--foreground', theme.ui.foreground);
-  root.style.setProperty('--border', theme.ui.border);
-  root.style.transition = 'background-color 150ms ease, color 150ms ease';
-}, [theme, isMounted]);
+// CSS variable injection (surfaces, semantics, accent-text, theme-color meta)
+const isDark = getLuminance(theme.ui.background) < 0.5;
 
-// Monaco theme synchronization
-useEffect(() => {
-  monaco.editor.defineTheme('custom-theme', {
-    base: theme.ui.background === '#ffffff' ? 'vs' : 'vs-dark',
-    inherit: true,
-    rules: [],
-    colors: {
-      'editor.background': theme.editor.background,
-      'editor.foreground': theme.editor.foreground,
-    },
-  });
-  monaco.editor.setTheme('custom-theme');
-}, [theme, monaco, isMounted]);
+// Monaco theme synchronization (luminance-based, not a color-name check)
+monaco.editor.defineTheme('custom-theme', {
+  base: isDark ? 'vs-dark' : 'vs',
+  ...
+});
+monaco.editor.setTheme('custom-theme');
 ```
 
 ---
 
 ## Services Reference
 
-### Services Directory: `app/services/`
-
-#### 1. **Database Service** ([`Database.ts`](app/services/Database.ts))
-- **Lines**: 38
-- **Library**: Dexie.js 4.x
-- **Purpose**: IndexedDB schema and operations
+### Services Directory: `app/services/` (live: `Database.ts`, `MarkdownParser.ts` — the legacy
+`ExportService.ts`/`ThemeAdapter.ts` were deleted; theming lives in `ThemeProvider.tsx`)
 
 ```typescript
 export class MarkdownDB extends Dexie {
   projects!: Table<Project, number>;
-  nodes!: Table<FileNode, number>;
-  documents!: Table<any, number>; // Legacy support
+  nodes!: Table<FileNode, number>; // +deletedAt (v3 trash), +isFavorite (v4)
+  revisions!: Table<Revision, number>; // v5: version history
+  documents!: Table<Record<string, unknown>, number>; // Legacy support
 
   constructor() {
     super('MarkdownConverterDB');
-    this.version(2).stores({
-      projects: '++id, name, updatedAt',
-      nodes: '++id, projectId, parentId, type, name, updatedAt',
-      documents: '++id, name, updatedAt' // Legacy
-    });
+    // versions 2→5 (see source for exact stores)
   }
 }
 
@@ -874,26 +837,25 @@ export const db = new MarkdownDB();
 
 ```typescript
 export class MarkdownParser {
-  private processor = unified()
-    .use(remarkParse)
-    .use(remarkGfm as any)
-    .use(remarkEmoji as any)
-    .use(remarkRehype)
-    .use(rehypeSanitize, {
-      tagNames: ['div','p','a','img','table','thead','tbody','tr','th','td','pre','code','ul','ol','li','hr','blockquote','h1','h2','h3','h4','h5','h6','span'],
-      attributes: {
-        '*': ['className', 'class'],
-        'a': ['href', 'title'],
-        'img': ['src', 'alt', 'title'],
-        'th': ['colspan','rowspan'],
-        'td': ['colspan','rowspan']
-      }
-    })
-    .use(rehypeHighlight)
-    .use(rehypeStringify);
+  private processor: Processor<MdastRoot, MdastRoot, HastRoot, HastRoot, string>;
+
+  constructor() {
+    this.processor = unified()
+      .use(remarkParse)
+      .use(remarkGfm)
+      .use(remarkMath)
+      .use(remarkRehype, { allowDangerousHtml: true })
+      .use(rehypeKatex)
+      .use(rehypeSlug)
+      .use(rehypeSanitize, { /* strict allowlist incl. KaTeX MathML */ })
+      .use(rehypeHighlight)
+      .use(rehypeForceSafeLinks)
+      .use(rehypeStringify, { allowDangerousHtml: true });
+  }
 
   async parse(markdown: string): Promise<string> {
-    const file = await this.processor.process(markdown);
+    const { content } = getFrontMatter(markdown); // gray-matter, never throws
+    const file = await this.processor.process(content);
     return String(file);
   }
 }
@@ -901,10 +863,8 @@ export class MarkdownParser {
 export const markdownParser = new MarkdownParser();
 ```
 
-#### 3. **Export Service** ([`ExportService.ts`](app/services/ExportService.ts))
-- **Lines**: 95
-- **Status**: Legacy (deprecated)
-- **Note**: Use new export system in `src/export/` instead
+#### 3. ~~Export Service~~ — removed
+`app/services/ExportService.ts` (legacy html2pdf path) was deleted; all exports go through `src/export/` (`ExportOrchestrator`). The `html2pdf.js` dependency was uninstalled with it.
 
 ---
 
@@ -975,6 +935,10 @@ export class ExportOrchestrator {
         return new (await import('./exporters/docx-exporter')).DocxExporter();
       case 'pptx':
         return new (await import('./exporters/pptx-exporter')).PptxExporter();
+      case 'png':
+        return new (await import('./exporters/png-exporter')).PngExporter();
+      case 'epub':
+        return new (await import('./exporters/epub-exporter')).EpubExporter();
       default:
         throw new Error('Unsupported export format: ' + format);
     }
@@ -985,7 +949,7 @@ export class ExportOrchestrator {
 ### Export Types ([`types.ts`](src/export/types.ts))
 
 ```typescript
-export type ExportFormat = 'md' | 'txt' | 'html' | 'pdf' | 'docx' | 'pptx';
+export type ExportFormat = 'md' | 'txt' | 'html' | 'pdf' | 'docx' | 'pptx' | 'png' | 'epub';
 
 export interface IExporter {
   format: ExportFormat;
@@ -1018,9 +982,7 @@ export interface ExportOptions {
   orientation: 'portrait' | 'landscape';
   margins: { top: number; right: number; bottom: number; left: number };
   fontSize: number;
-  headerFooter: boolean;
   embedImages: boolean;
-  syntaxHighlight: boolean;
 }
 ```
 
@@ -1059,19 +1021,24 @@ export interface ExportOptions {
 - **Note**: Uses `pptxgenjs` (dynamically imported) to build a title slide plus one content slide
   per markdown section
 
+#### 7. **PNG Exporter** ([`png-exporter.ts`](src/export/exporters/png-exporter.ts))
+- **Status**: ✅ Complete
+- **Note**: Themed 2x off-screen snapshot via `html-to-image` (dynamically imported)
+
+#### 8. **EPUB Exporter** ([`epub-exporter.ts`](src/export/exporters/epub-exporter.ts))
+- **Status**: ✅ Complete
+- **Note**: Minimal EPUB 3 via JSZip (stored mimetype first, container, package, XHTML spine)
+
 ### Export UI Components
 
 #### ExportMenu ([`ExportMenu.tsx`](src/export/components/ExportMenu.tsx))
-- **Lines**: 39
-- **Features**: Dropdown menu with 6 format options
+- **Features**: Dropdown menu with 8 format options + outcome hints + last-used check
 
 #### ExportOptionsDialog ([`ExportOptionsDialog.tsx`](src/export/components/ExportOptionsDialog.tsx))
-- **Lines**: 115
-- **Features**: Export configuration UI
+- **Features**: Fixed-skeleton export configuration (Output summary, Style, Page) with validation + cancellable run
 
 #### ExportProgressBar ([`ExportProgressBar.tsx`](src/export/components/ExportProgressBar.tsx))
-- **Lines**: 44
-- **Features**: Loading overlay during export
+- **Features**: Cancellable loading overlay with percentage
 
 ---
 
@@ -1079,28 +1046,24 @@ export interface ExportOptions {
 
 ### Zustand Store ([`store.ts`](app/store.ts))
 
-**Lines**: 430  
-**Location**: `app/store.ts`
-
-### Store Structure
-
 ```typescript
 interface MarkdownStore {
-  // Editor Content
+  // Editor Content (+ save lifecycle: idle|dirty|saving|saved|error, revision race guard)
   markdown: string;
   setMarkdown: (markdown: string) => void;
+  setMarkdownFromUser: (markdown: string) => void;
 
   // File System State
   activeProjectId: number | null;
   activeFileId: number | null;
-  setActiveProject: (id: number | null) => void;
-  setActiveFile: (id: number | null) => void;
 
-  // Theme State
+  // UI State (persisted, except pendingDeepLink)
+  viewMode: 'editor' | 'split' | 'preview';
+  pendingDeepLink: string | null; // one-shot launch intent (?new=file)
+
+  // Theme State (17 presets)
   theme: ThemeConfig;
-  setTheme: (theme: ThemeConfig) => void;
-  resetTheme: () => void;
-  applyPreset: (presetName: string) => void;
+  // …setters, resetTheme, applyPreset
 }
 ```
 
@@ -1129,6 +1092,8 @@ export const useMarkdownStore = create<MarkdownStore>()(
     }),
     {
       name: 'markdown-converter-storage',
+      // Persists selection, save state, UI flags, theme — but NOT the full
+      // markdown text (lives in Dexie) or pendingDeepLink (one-shot).
     }
   )
 );
@@ -1159,7 +1124,16 @@ export interface FileNode {
   content?: string;         // Only populated for files
   createdAt: Date;
   updatedAt: Date;
-  isOpen?: boolean;         // UI state (optional)
+  deletedAt?: Date | null;  // v3: trash
+  isFavorite?: boolean;     // v4: pinning (unindexed)
+  isOpen?: boolean;
+}
+
+export interface Revision {  // v5: version history
+  id?: number;
+  fileId: number;
+  content: string;
+  createdAt: Date;
 }
 ```
 
@@ -1168,7 +1142,8 @@ export interface FileNode {
 | Table | Primary Key | Secondary Indexes |
 |-------|-------------|-------------------|
 | projects | ++id (auto) | name, updatedAt |
-| nodes | ++id (auto) | projectId, parentId, type, name, updatedAt |
+| nodes | ++id (auto) | projectId, parentId, type, name, updatedAt, deletedAt |
+| revisions | ++id (auto) | fileId, createdAt |
 | documents | ++id (auto) | name, updatedAt |
 
 ### Common Queries
@@ -1183,10 +1158,11 @@ const nodes = await db.nodes
   .toArray();
 
 // Get recent files
+// NOTE: reverse() before sortBy() is ignored — sortBy is always ascending
 const recents = await db.nodes
   .where('type').equals('file')
-  .reverse()
   .sortBy('updatedAt');
+const recentFiles = recents.filter((f) => !f.deletedAt).slice(-5).reverse();
 
 // Update file
 await db.nodes.update(id, {
@@ -1420,7 +1396,7 @@ static assets, and notes live in IndexedDB. Caveat: Monaco Editor loads from CDN
 the editor pane needs network until Monaco is bundled (M6).
 
 ### Q: How do I export my documents?
-**A**: Click the Export button in the header, choose your format (Markdown, HTML, PDF, DOCX, TXT, PPTX, or PNG), configure options, and download.
+**A**: Click the Export button in the header, choose your format (Markdown, HTML, PDF, DOCX, TXT, PPTX, PNG, or EPUB), configure options, and download.
 
 ### Q: Can I organize files into folders?
 **A**: Yes! The app supports hierarchical folder structures within projects.
@@ -1447,7 +1423,7 @@ the editor pane needs network until Monaco is bundled (M6).
 **A**: The new modular export system is in `src/export/`. The old `app/services/ExportService.ts` is deprecated.
 
 ### Q: Why are there TypeScript errors?
-**A**: Some known non-blocking TypeScript errors exist related to type definitions. These don't affect runtime functionality.
+**A**: There are none — `npx tsc --noEmit` is clean and `npx eslint .` reports 0 errors / 0 warnings. An older revision of this FAQ listed four historical errors; all were fixed.
 
 ---
 

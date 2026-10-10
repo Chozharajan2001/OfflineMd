@@ -131,9 +131,9 @@ npm run lint     # ESLint checking
 │              │              │              │    System      │
 ├──────────────┼──────────────┼──────────────┼────────────────┤
 │ • Header     │ • Database   │ • Zustand    │ • Orchestrator │
-│ • Sidebar    │ • Parser     │ • Themes(17) │ • Exporters(6) │
-│ • Editor     │ • ExportSvc  │ • Persistence│ • UI Components│
-│ • Preview    │              │              │                │
+│ • Sidebar    │ • Parser     │ • Themes(17) │ • Exporters(8) │
+│ • Editor     │ • History    │ • Persistence│ • UI Components│
+│ • Preview    │   utils      │              │                │
 │ • Layout     │              │              │                │
 └──────────────┴──────────────┴──────────────┴────────────────┘
                            │
@@ -457,11 +457,13 @@ await triggerDownload(result.blob, result.filename);
 | Exporter | File | Status | Library | Features |
 |----------|------|--------|---------|----------|
 | Markdown | `markdown-exporter.ts` | Complete | Native | Raw text export |
-| HTML | `html-exporter.ts` | Complete | Unified.js | Self-contained with CSS |
+| HTML | `html-exporter.ts` | Complete | Unified.js | Self-contained with CSS, optional TOC |
 | Plain Text | `plaintext-exporter.ts` | Complete | Native | Stripped formatting |
-| PDF | `pdf-exporter.ts` | Complete | pdf-lib | Multi-page, WinAnsi, embedded PNG/JPG |
+| PDF | `pdf-exporter.ts` | Complete | pdf-lib | Multi-page, WinAnsi, embedded PNG/JPG, configurable layout |
 | DOCX | `docx-exporter.ts` | Complete | docx | Headings, lists, blockquotes, tables, inline formatting |
 | PPTX | `pptx-exporter.ts` | Complete | pptxgenjs | One slide per section, title + body |
+| PNG | `png-exporter.ts` | Complete | html-to-image | Themed 2x snapshot |
+| EPUB | `epub-exporter.ts` | Complete | jszip | Minimal EPUB 3 |
 
 ### Export Options Interface
 
@@ -473,11 +475,10 @@ interface ExportOptions {
   orientation: 'portrait' | 'landscape';
   margins: { top: number; right: number; bottom: number; left: number };
   fontSize: number;
-  headerFooter: boolean;
   embedImages: boolean;
-  syntaxHighlight: boolean;
 }
 ```
+// Deleted as dead (nothing ever read them): `headerFooter`, `syntaxHighlight`. Every remaining option is both rendered in the dialog and read by at least one exporter.
 
 ---
 

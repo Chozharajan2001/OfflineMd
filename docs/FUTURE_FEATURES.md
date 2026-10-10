@@ -27,12 +27,10 @@ but which **are** implemented are recorded at the bottom so they are not re-adde
     virtual-keyboard handling, and phone/tablet layout tuning.
 
 - **Additional Export Formats**
-  - EPUB, ODF, LaTeX, or custom Markdown-flavoured HTML templates.
-  - Also open: image embedding in DOCX (PDF already embeds PNG/JPG).
+  - EPUB SHIPPED (`epub-exporter.ts`); ODF/LaTeX deferred (no demand signal).
+  - Still open: image embedding in DOCX (PDF already embeds PNG/JPG).
 
-- **Edit-only / preview-only view modes**
-  - `ResizableLayout.tsx` renders a permanent 50/50 split (`defaultSize={50} minSize={20}`);
-    there is no toggle to a single pane.
+- **Edit-only / preview-only view modes** — DONE (`viewMode` + conditional layout).
 
 - **Performance Optimizations**
   - ~~Lazy-load export modules~~ already done via dynamic `import()` in `export-service.ts:21-34`.
@@ -48,6 +46,11 @@ but which **are** implemented are recorded at the bottom so they are not re-adde
 | Bulk export of a whole project | `app/utils/zip-project.ts` (`buildProjectZip`), used at `Sidebar.tsx:10` |
 | PPTX export | `pptx-exporter.ts` (325 lines) using `pptxgenjs` |
 | Rich DOCX conversion | `docx-exporter.ts` — headings, lists, blockquotes, tables, inline runs |
-| Image embedding in PDF | `pdf-exporter.ts:202-206`, `MAX_IMAGE_BYTES` |
+| Image embedding in PDF | `pdf-exporter.ts`, `MAX_IMAGE_BYTES` |
+| PNG export | `png-exporter.ts` (themed 2x snapshot) |
+| EPUB export | `epub-exporter.ts` (minimal EPUB 3) |
+| Move dialog + autosave + trash | `Sidebar.tsx`, `Editor.tsx`, Dexie v3 |
+| Content search + favorites + history | `Sidebar.tsx`, `CommandPalette.tsx`, `HistoryDialog.tsx` |
+| View modes + PWA install | `ResizableLayout.tsx`, `PwaInstall.tsx`, Serwist |
 | Responsive/mobile sidebar | commit `d73b54f`, `Sidebar.tsx` overlay + `toggle-sidebar` |
 | Editor↔preview scroll sync | `Editor.tsx:79`, toggle in `Header.tsx:365` |

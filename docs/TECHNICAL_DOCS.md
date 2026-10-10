@@ -127,13 +127,12 @@ The Markdown Editor & Converter is a single-page application (SPA) built with Ne
 ### 1. Editor Component
 
 **File**: `app/components/Editor.tsx`
-**Lines**: 46
 **Type**: Client Component ('use client')
 
 #### Implementation Details
 
 ```typescript
-// Client-side hydration handling
+// Client-side hydration + autosave (2.5s idle, revision race-guard)
 const [isClient, setIsClient] = useState(false);
 useEffect(() => { setIsClient(true); }, []);
 
@@ -142,8 +141,8 @@ useEffect(() => { setIsClient(true); }, []);
   height="100%"
   language="markdown"
   value={markdown}
-  onChange={(value) => setMarkdown(value || '')}
-  theme="vs-dark"
+  onChange={(value) => setMarkdownFromUser(value || '')}
+  theme="custom-theme" // defined by ThemeProvider, not a built-in
   options={{
     minimap: { enabled: false },
     wordWrap: 'on',
@@ -159,7 +158,9 @@ useEffect(() => { setIsClient(true); }, []);
 
 #### Key Features
 - **SSR-safe**: Only renders on client-side to avoid hydration mismatches
-- **Theme-responsive**: Font size synced with store theme
+- **Theme-responsive**: Font size synced with store theme; `custom-theme` from ThemeProvider
+- **Autosave**: 2.5s idle debounce persists to the active file with revision guard
+- **Single status surface**: state dot + stats in the status bar (no floating badge)
 - **Markdown mode**: Full syntax highlighting and IntelliSense
 - **Font features**: Ligatures enabled for better code readability
 
@@ -172,35 +173,30 @@ useEffect(() => { setIsClient(true); }, []);
 ### 2. Preview Component
 
 **File**: `app/components/Preview.tsx`
-**Lines**: 256
 **Type**: Client Component
 
 #### Implementation Details
 
-**Debounced Parsing**:
+**Debounced Parsing** (150ms, race-token guarded, double-sanitized):
 ```typescript
 const debouncedParse = useRef(
-  debounce(async (md: string) => {
+  debounce(async (md: string, seq: number) => {
     const html = await markdownParser.parse(md);
-    setRenderedHtml(html);
+    const safeHtml = DOMPurify.sanitize(html, { /* strict allowlist */ });
+    if (parseSeq.current !== seq) return; // stale parse loses
+    setRenderedHtml(safeHtml as string);
   }, 150) // 150ms delay
 );
 ```
 
-**Mermaid Diagram Rendering**:
+**Mermaid Diagram Rendering** (scoped to `previewRef`, `securityLevel: 'strict'`):
 ```typescript
-useEffect(() => {
-  if (!isClient) return;
-  const timer = setTimeout(() => {
-    const mermaidNodes = document.querySelectorAll('.language-mermaid');
-    if (mermaidNodes.length > 0) {
-      mermaid.run({ nodes: Array.from(mermaidNodes) })
-        .catch((err) => console.debug('Mermaid rendering:', err));
-    }
-  }, 100);
-  return () => clearTimeout(timer);
-}, [renderedHtml, isClient]);
+scope.querySelectorAll('pre > code.language-mermaid').forEach((codeEl) => { /* … */ });
+await mermaid.run({ nodes: mermaidNodes })
+  .catch((err) => console.debug('Mermaid rendering validation:', err));
 ```
+
+Also listens for `editor-scroll` (sync) and `toc-navigate` (sidebar TOC jumps).
 
 **Theme-aware Inline Styles**:
 The component injects CSS dynamically based on the current theme:
@@ -221,24 +217,20 @@ The component injects CSS dynamically based on the current theme:
 ### 3. Sidebar Component
 
 **File**: `app/components/Sidebar.tsx`
-**Lines**: 202
 **Type**: Client Component
+**Purpose**: Projects, nested tree, name+content search, recents, favorites, contents, trash, move/history dialogs
 
 #### Implementation Details
 
 **Reactive Data with Live Queries**:
 ```typescript
 const projects = useLiveQuery(() => db.projects.toArray()) || [];
-
-const NodeList = ({ parentId }: { parentId: number | null }) => {
-  const nodes = useLiveQuery(
-    () => activeProjectId
-      ? db.nodes.where({ projectId: activeProjectId, parentId }).toArray()
-      : []
-    , [activeProjectId, parentId]
-  ) || [];
-  // ...
-};
+const projectNodesResult = useLiveQuery(
+  () => (activeProjectId ? db.nodes.where('projectId').equals(activeProjectId).toArray() : []),
+  [activeProjectId]
+);
+// tree/search derive from projectNodes (trashed filtered out);
+// Trash, Recents, Favorites derive from the same result
 ```
 
 **Recursive Folder Rendering**:
@@ -261,10 +253,10 @@ const NodeItem = ({ node }: { node: FileNode }) => {
 ```
 
 **CRUD Operations**:
-- `createProject()`: Prompts for name, adds to DB
-- `createNode()`: Creates file/folder with parent reference
-- `deleteNode()`: Removes node and updates active file if needed
-- `loadFile()`: Fetches content and updates editor
+- `createProject()` / `createNode()`: dialogs, parent reference
+- Soft-delete to Trash with restore/purge + undo toasts (Dexie `deletedAt`)
+- `renameNode()`, `Move to…` dialog with cycle guard, per-file History dialog
+- `loadFile()`: fetches content and updates editor
 
 #### State Management
 - `expandedFolders`: Local state for folder expansion
@@ -276,96 +268,72 @@ const NodeItem = ({ node }: { node: FileNode }) => {
 ### 4. Header Component
 
 **File**: `app/components/Header.tsx`
-**Lines**: 205
 **Type**: Client Component
 
 #### Implementation Details
 
-**Save Logic**:
+**Save Logic** (revision-guarded, toast feedback — never `alert()`):
 ```typescript
 const handleSave = async () => {
+  if (isSaving) return;
   if (activeFileId) {
-    // Update existing file
-    await db.nodes.update(activeFileId, {
-      content: markdown,
-      updatedAt: new Date()
-    });
+    const currentRevision = revision;
+    setSaving();
+    await db.nodes.update(activeFileId, { content: markdown, updatedAt: new Date() });
+    void captureRevision(activeFileId, markdown);
+    if (useMarkdownStore.getState().revision === currentRevision) setSaved();
+    else markDirty();
+    toast.success('File saved!');
   } else {
-    // Create new file
-    if (!activeProjectId) {
-      alert("Please select a project first.");
-      return;
-    }
-    const id = await db.nodes.add({
-      projectId: activeProjectId,
-      parentId: null,
-      type: 'file',
-      name,
-      content: markdown,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    setActiveFile(id as number);
+    if (!activeProjectId) { toast.error('Please select a project…'); return; }
+    setOpenSaveAsDialog(true);
   }
 };
 ```
 
-**Export Integration**:
+**Export Integration** (split-button + run-token cancellation):
 ```typescript
-const handleExport = async (format: ExportFormat, options: ExportOptions) => {
-  setExporting(true);
-  try {
-    const { markdown, theme } = useMarkdownStore.getState();
-    const result = await ExportOrchestrator.export(format, {
-      markdown,
-      theme,
-      options,
-      metadata: {}
-    });
-    await triggerDownload(result.blob, result.filename);
-  } finally {
-    setExporting(false);
-  }
-};
+// Last-used format repeats from the main button; md/txt export directly.
+// Runs carry a token so Cancel discards late results.
+const result = await ExportOrchestrator.export(format, {
+  markdown, theme, options, metadata: await buildExportMetadata(),
+  onProgress: (p) => { if (exportRunId.current === runId) setExportProgress(p); },
+});
+await triggerDownload(result.blob, result.filename);
 ```
 
 #### UI Components
-- **File Operations**: Save, Import (with hidden file input)
-- **Export Menu**: Dropdown with 6 format options
-- **Settings Dialog**: Theme preset selection, font size
-- **Progress Bar**: Loading overlay during export
+- **Primary Save button + export split-button** (last format + menu), overflow menu (import file/URL, copy, scroll sync, view modes), view-mode segmented control, settings tabs (Appearance swatches / Workspace backup)
+- **Export Menu**: Dropdown with 8 format options + hints + last-used check
+- **Settings**: theme swatch radios, font size, backup export/restore
+- **Progress Bar**: cancellable overlay with percentage
 
 ---
 
 ### 5. ThemeProvider Component
 
 **File**: `app/components/ThemeProvider.tsx`
-**Lines**: 57
 **Type**: Client Component
+**Purpose**: Theme tokens (surfaces, semantics, `--accent-text`), Monaco sync, `theme-color` meta
 
 #### Implementation Details
 
-**CSS Variable Injection**:
+**CSS Variable Injection** (luminance-derived state layers, `--surface-1/2/3`
+elevation, `--color-success/warning/danger/info`, contrast-checked
+`--accent-text`; mounted via `useSyncExternalStore`, no set-state-in-effect):
 ```typescript
-useEffect(() => {
-  if (!isMounted) return;
-  const root = document.documentElement;
-  root.style.setProperty('--background', theme.ui.background);
-  root.style.setProperty('--foreground', theme.ui.foreground);
-  root.style.setProperty('--border', theme.ui.border);
-  root.style.setProperty('--accent', theme.ui.accent);
-  root.style.setProperty('--editor-bg', theme.editor.background);
-  root.style.setProperty('--preview-bg', theme.preview.background);
-  root.style.transition = 'background-color 150ms ease, color 150ms ease';
-}, [theme, isMounted]);
+const isDark = getLuminance(theme.ui.background) < 0.5;
+const state = (alpha: number) => (isDark ? `rgba(255,255,255,${alpha})` : `rgba(9,9,11,${alpha})`);
+root.style.setProperty('--surface-2', surface(0.08)); // dropdowns/dialogs/toasts
+root.style.setProperty('--accent-text', accentTextFor(/* bg, accent, fg */));
+root.style.transition = 'background-color 150ms ease, color 150ms ease';
 ```
 
-**Monaco Theme Synchronization**:
+**Monaco Theme Synchronization** (luminance-based, not a color-name check):
 ```typescript
-useEffect(() => {
-  if (!isMounted || !monaco) return;
-  monaco.editor.defineTheme('custom-theme', {
-    base: theme.ui.background === '#ffffff' ? 'vs' : 'vs-dark',
+const isDark = getLuminance(theme.ui.background) < 0.5; // <0.5 threshold
+monaco.editor.defineTheme('custom-theme', {
+  base: isDark ? 'vs-dark' : 'vs',
     inherit: true,
     rules: [],
     colors: {
@@ -468,27 +436,29 @@ User Action (Create/Delete/Load)
 ### Zustand Store Architecture
 
 **File**: `app/store.ts`
-**Lines**: 430
 
 #### Store Structure
 
 ```typescript
 interface MarkdownStore {
-  // Content State
+  // Content State (+ save lifecycle)
   markdown: string;
   setMarkdown: (markdown: string) => void;
+  setMarkdownFromUser: (markdown: string) => void; // marks dirty, bumps revision
+  documentStatus: 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
+  revision: number; // race guard for overlapping saves
 
   // Navigation State
   activeProjectId: number | null;
   activeFileId: number | null;
-  setActiveProject: (id: number | null) => void;
-  setActiveFile: (id: number | null) => void;
+
+  // UI State
+  viewMode: 'editor' | 'split' | 'preview';
+  pendingDeepLink: string | null; // one-shot launch intent, never persisted
 
   // Theme State
   theme: ThemeConfig;
-  setTheme: (theme: ThemeConfig) => void;
-  resetTheme: () => void;
-  applyPreset: (presetName: string) => void;
+  // …setters, resetTheme, applyPreset
 }
 ```
 
@@ -526,8 +496,9 @@ export const useMarkdownStore = create<MarkdownStore>()(
     (set) => ({ /* store implementation */ }),
     {
       name: 'markdown-converter-storage',
-      // Persists: markdown, active IDs, theme
-      // Does NOT persist: transient UI state
+      // Persists: selection, save state, UI flags, theme.
+      // Does NOT persist: full markdown text (lives in Dexie) or
+      // pendingDeepLink (one-shot launch intent).
     }
   )
 );
@@ -549,43 +520,37 @@ export const useMarkdownStore = create<MarkdownStore>()(
 ### Database Schema
 
 **File**: `app/services/Database.ts`
-**Lines**: 38
 
-#### Schema Definition
+#### Schema Definition (Dexie v5)
 
 ```typescript
-export interface Project {
-  id?: number;              // Auto-increment primary key
-  name: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 export interface FileNode {
-  id?: number;              // Auto-increment primary key
-  projectId: number;        // Foreign key to Project
-  parentId: number | null;  // Self-referential for folders
+  id?: number;
+  projectId: number;
+  parentId: number | null;
   type: 'file' | 'folder';
   name: string;
   content?: string;         // Only populated for files
   createdAt: Date;
   updatedAt: Date;
-  isOpen?: boolean;         // UI state (optional)
+  deletedAt?: Date | null;  // v3: soft-delete (trash)
+  isFavorite?: boolean;     // v4: pinning (unindexed — booleans aren't valid keys)
+  isOpen?: boolean;
+}
+
+export interface Revision {  // v5: version history
+  id?: number;
+  fileId: number;
+  content: string;
+  createdAt: Date;
 }
 
 export class MarkdownDB extends Dexie {
   projects!: Table<Project, number>;
   nodes!: Table<FileNode, number>;
-  documents!: Table<any, number>; // Legacy support
-
-  constructor() {
-    super('MarkdownConverterDB');
-    this.version(2).stores({
-      projects: '++id, name, updatedAt',
-      nodes: '++id, projectId, parentId, type, name, updatedAt',
-      documents: '++id, name, updatedAt'
-    });
-  }
+  revisions!: Table<Revision, number>;
+  documents!: Table<Record<string, unknown>, number>; // Legacy support
+  // versions 2→5: +deletedAt index, +revisions store
 }
 ```
 
@@ -594,7 +559,8 @@ export class MarkdownDB extends Dexie {
 | Table | Primary Key | Secondary Indexes |
 |-------|-------------|-------------------|
 | projects | ++id (auto) | name, updatedAt |
-| nodes | ++id (auto) | projectId, parentId, type, name, updatedAt |
+| nodes | ++id (auto) | projectId, parentId, type, name, updatedAt, deletedAt |
+| revisions | ++id (auto) | fileId, createdAt |
 | documents | ++id (auto) | name, updatedAt |
 
 #### Query Patterns
@@ -611,12 +577,13 @@ const nodes = await db.nodes
   .toArray();
 ```
 
-**Get recent files**:
+**Get recent files** (note: `reverse()` before `sortBy()` is ignored by Dexie —
+`sortBy` always returns ascending, so take the tail):
 ```typescript
 const recents = await db.nodes
   .where('type').equals('file')
-  .reverse()
   .sortBy('updatedAt');
+const recentFiles = recents.filter((f) => !f.deletedAt).slice(-5).reverse();
 ```
 
 **Update file**:
@@ -634,6 +601,9 @@ await db.nodes.update(id, {
 ### Processing Flow
 
 ```
+Front matter (gray-matter) stripped
+      │
+      ▼
 Raw Markdown
      │
      ▼
@@ -643,12 +613,23 @@ Raw Markdown
          │
          ▼
 ┌─────────────────┐
+│ remark-gfm/math │  Tables, strikethrough, \$ math
+└────────┬────────┘
+          │
+          ▼
+┌─────────────────┐
 │  remark-rehype  │  Convert to HTML AST
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│  rehype-sanitize│  XSS protection
+│ rehype-katex/   │  Math HTML + heading ids (TOC anchors)
+│ rehype-slug     │
+└────────┬────────┘
+          │
+          ▼
+┌─────────────────┐
+│  rehype-sanitize│  Strict allowlist incl. KaTeX MathML
 └────────┬────────┘
          │
          ▼
@@ -667,26 +648,29 @@ Raw Markdown
 
 ### Implementation
 
-**File**: `app/services/MarkdownParser.ts`
-**Lines**: 30
+**File**: `app/services/MarkdownParser.ts` (typed `Processor<MdastRoot, …, HastRoot, string>`)
 
 ```typescript
 export class MarkdownParser {
-  private processor = unified()
-    .use(remarkParse)
-    .use(remarkRehype)
-    .use(rehypeSanitize, {
-      attributes: {
-        '*': ['className', 'class'],
-        'code': ['className', 'class'],
-        'span': ['className', 'class'],
-      }
-    })
-    .use(rehypeHighlight)
-    .use(rehypeStringify);
+  private processor: Processor<MdastRoot, MdastRoot, HastRoot, HastRoot, string>;
+
+  constructor() {
+    this.processor = unified()
+      .use(remarkParse)
+      .use(remarkGfm)
+      .use(remarkMath)
+      .use(remarkRehype, { allowDangerousHtml: true })
+      .use(rehypeKatex)
+      .use(rehypeSlug)
+      .use(rehypeSanitize, { /* strict allowlist, see source */ })
+      .use(rehypeHighlight)
+      .use(rehypeForceSafeLinks)
+      .use(rehypeStringify, { allowDangerousHtml: true });
+  }
 
   async parse(markdown: string): Promise<string> {
-    const file = await this.processor.process(markdown);
+    const { content } = getFrontMatter(markdown);
+    const file = await this.processor.process(content);
     return String(file);
   }
 }
@@ -694,14 +678,13 @@ export class MarkdownParser {
 
 ### Security Configuration
 
-**Allowed Attributes**:
-- `className` and `class` on all elements
-- Additional classes for `code` and `span` elements
+**Allowed Attributes** (superset; see source for the exact list):
+- `class`/`className`/`id`/`aria-hidden` broadly; per-tag `href/rel/target`,
+  `src/alt`, `colspan/rowspan`, KaTeX `display`/`encoding`
 
-**Sanitization Strategy**:
-- Removes dangerous HTML (scripts, event handlers)
-- Preserves markdown-generated classes for styling
-- Allows safe HTML from markdown (links, images, tables)
+**Sanitization Strategy** (defense in depth):
+- rehype-sanitize allowlist in the pipeline, then a DOMPurify second pass at
+  every render/export boundary; Mermaid runs `securityLevel: 'strict'`
 
 ---
 
@@ -792,9 +775,7 @@ export interface ExportOptions {
   orientation: 'portrait' | 'landscape';
   margins: { top: number; right: number; bottom: number; left: number };
   fontSize: number;
-  headerFooter: boolean;
   embedImages: boolean;
-  syntaxHighlight: boolean;
 }
 ```
 
@@ -842,8 +823,7 @@ Features:
 #### 3. PDF Exporter
 
 **File**: `src/export/exporters/pdf-exporter.ts`
-**Status**: Complete
-**Lines**: ~800
+**Status**: Complete (~830 lines)
 
 **WinAnsi / glyph-safety support** (`pdf-exporter.ts:740`):
 
@@ -893,7 +873,6 @@ the selected font cannot render is replaced with `?`, and results are memoised p
 
 **File**: `src/export/exporters/docx-exporter.ts`
 **Status**: Complete
-**Lines**: ~507
 
 Markdown is parsed into typed lines and converted to real Word structures — `HeadingLevel`
 headings, bullet/ordered lists, blockquotes, tables (`Table`/`TableRow`/`TableCell`) and inline
@@ -913,41 +892,50 @@ Converts markdown to plain text by stripping formatting.
 
 **File**: `src/export/exporters/pptx-exporter.ts`
 **Status**: Complete
-**Lines**: ~325
 
 Generates a real deck with `pptxgenjs` (dynamic import): a title slide, then one content slide per
 markdown section, with text sizing and overflow handling. The earlier "returns a placeholder text
 file" note no longer applies.
+
+#### 7. PNG Exporter
+
+**File**: `src/export/exporters/png-exporter.ts`
+**Status**: Complete
+
+Themed 2x off-screen snapshot via `html-to-image` (lazy); hex-validated colors; progress callbacks.
+
+#### 8. EPUB Exporter
+
+**File**: `src/export/exporters/epub-exporter.ts`
+**Status**: Complete
+
+Minimal EPUB 3 via JSZip: uncompressed `mimetype` first, container, package, single-XHTML spine.
 
 ### Export UI Components
 
 #### ExportMenu
 
 **File**: `src/export/components/ExportMenu.tsx`
-**Lines**: 39
 
-- Dropdown menu with 6 format options
-- Icons from Lucide React
+- Dropdown menu with 8 format options + outcome hints + last-used check
+- Distinct Lucide icons per family; optional custom trigger (split-button chevron)
 - Radix UI DropdownMenu primitive
 
 #### ExportOptionsDialog
 
 **File**: `src/export/components/ExportOptionsDialog.tsx`
-**Lines**: 115
 
-Options UI:
-- Include theme toggle
-- Table of contents toggle
-- Page size selector (A4, Letter, A3)
-- Orientation selector (portrait, landscape)
+Fixed skeleton — always the same shape:
+- Output summary (live filename preview + theme flag)
+- Style section (theme / images / TOC toggles, per-format gated)
+- Page section for PDF (size, orientation, font size, margins with validation)
+- Cancel / Export actions; run-token cancellation discards late results
 
 #### ExportProgressBar
 
 **File**: `src/export/components/ExportProgressBar.tsx`
-**Lines**: 44
 
-- Spinner overlay during export
-- Cancel button support
+- Cancellable modal overlay with spinner + percentage (`onCancel` prop)
 - Z-index 50 for overlay
 
 ---

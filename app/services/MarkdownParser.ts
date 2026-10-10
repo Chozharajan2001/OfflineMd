@@ -7,12 +7,12 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeSlug from 'rehype-slug';
 import rehypeSanitize from 'rehype-sanitize';
-import { getFrontMatter } from '../../src/export/utils/front-matter';
 import rehypeHighlight from 'rehype-highlight';
 import { visit } from 'unist-util-visit';
 import type { Root as HastRoot } from 'hast';
 import type { Root as MdastRoot } from 'mdast';
 import type { Processor } from 'unified';
+import { getFrontMatter } from '../../src/export/utils/front-matter';
 // mermaid rendering handled on client preview, emoji support via GFM
 
 function rehypeForceSafeLinks() {
@@ -34,6 +34,11 @@ function rehypeForceSafeLinks() {
 }
 
 class MarkdownParser {
+  // Static pipeline (B.2 measured + reverted 2026-10-10): lazy-loading this
+  // stack (~750KB) dropped Lighthouse perf 54→38 / LCP 5.5s→12s — the preview
+  // is the LCP element and cannot paint until the chunk arrives, and Next
+  // ignores webpackPreload here (no preload links emitted). CDN Monaco +
+  // preconnect stays (bundling measured +10MB, rejected).
   private processor: Processor<MdastRoot, MdastRoot, HastRoot, HastRoot, string>;
 
   constructor() {
@@ -91,13 +96,13 @@ class MarkdownParser {
 
       // The core fix: await the process
       const vfile = await this.processor.process(content);
-      
+
       // Return the string content
       return String(vfile);
     } catch (error) {
       console.error('[MarkdownParser] Error:', error);
       // Return original markdown so the user doesn't lose their work
-      return markdown; 
+      return markdown;
     }
   }
 }

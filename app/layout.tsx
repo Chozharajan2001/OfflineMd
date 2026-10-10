@@ -43,6 +43,11 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" suppressHydrationWarning>
+            <head>
+                {/* Monaco loads from CDN at runtime (deliberate: bundling adds ~10MB, see M6) */}
+                <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
+                <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
+            </head>
             <body
                 className={`${geistSans.variable} ${geistMono.variable} antialiased`}
             >

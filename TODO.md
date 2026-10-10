@@ -199,15 +199,23 @@ We can destroy a document with one click today. The competitor cannot.
 
 ## M6 — Performance
 
-- [ ] **Split the 667 KB markdown + highlight.js chunk off the initial path** — after Mermaid
-  left, this is the largest thing in first load. Load only the languages a document uses, or
-  lazy-load the preview pipeline.
-- [ ] **Monaco is fetched from a CDN at runtime** — Lighthouse flagged 576 KB of unused
-  third-party JS and a missing preconnect. Decide deliberately: bundle it, or keep the CDN and
-  add `preconnect`. This blocks true offline (M1).
-- [ ] **Virtualise the file tree** for large projects (m/E).
-- [ ] **Re-run Lighthouse after each of these** — baseline after the current fixes is
-  Performance 54, LCP 5.5 s, TBT 1,180 ms, Accessibility 89, initial JS 1,243 KB.
+- [x] **Monaco CDN vs bundle — MEASURED, CDN kept** (2026-10-10): bundling via
+  `monaco-editor-webpack-plugin` (markdown-only) produced **+10.4MB raw**
+  (3.8 + 3.3 + 3.1MB chunks + 321KB worker) — rejected. Kept CDN + `preconnect`/
+  `dns-prefetch` in `layout.tsx`. Offline editor remains the known gap.
+- [x] **Parser chunk split — MEASURED, REVERTED** (2026-10-10): lazy `MarkdownParser`
+  dropped the top chunk 755→499KB but Lighthouse perf went 54→38 and LCP 5.5s→12s
+  (preview is the LCP element; Next ignores `webpackPreload` here — verified zero
+  preload links emitted). Reverted to static pipeline per the gate. Largest
+  remaining waste is Monaco-from-CDN itself (573KB unused on first paint).
+- [ ] **Virtualise the file tree** — skipped, no evidence: sidebar lists are small
+  (memoized Dexie queries); revisit only with profiling data (m/E).
+- [x] **Lighthouse re-run** (2026-10-10, local prod, this machine loaded):
+  Performance **37–38**, LCP **12–14s**, TBT **~4–5s**, Accessibility **91** —
+  below the 2026-10-04 baseline (54/5.5s/1180ms/89) measured under different
+  conditions and before KaTeX landed. Next step is a clean-machine rerun, not
+  more code changes: the code-level levers (Monaco bundle, parser split) both
+  measured net-negative.
 
 ## M7 — Enhancements (no parity pressure)
 

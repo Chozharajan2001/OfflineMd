@@ -21,9 +21,17 @@ export interface FileNode {
   isOpen?: boolean; // For folder expansion state (optional storage)
 }
 
+export interface Revision {
+  id?: number;
+  fileId: number;
+  content: string;
+  createdAt: Date;
+}
+
 export class MarkdownDB extends Dexie {
   projects!: Table<Project, number>;
   nodes!: Table<FileNode, number>;
+  revisions!: Table<Revision, number>;
   // Keep legacy for migration support if needed, but we'll focus on new system
   documents!: Table<Record<string, unknown>, number>;
 
@@ -47,6 +55,13 @@ export class MarkdownDB extends Dexie {
       projects: '++id, name, updatedAt',
       nodes: '++id, projectId, parentId, type, name, updatedAt, deletedAt',
       documents: '++id, name, updatedAt'
+    });
+    // v5: version history. Revisions are append-only snapshots per file.
+    this.version(5).stores({
+      projects: '++id, name, updatedAt',
+      nodes: '++id, projectId, parentId, type, name, updatedAt, deletedAt',
+      documents: '++id, name, updatedAt',
+      revisions: '++id, fileId, createdAt'
     });
   }
 }

@@ -7,6 +7,7 @@ import { useMarkdownStore } from '../store';
 import { db, FileNode } from '../services/Database';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ConfirmDialog, InputDialog } from './dialogs';
+import { HistoryDialog } from './HistoryDialog';
 import { Button } from './ui';
 import { TableOfContents } from './TableOfContents';
 import { useToast } from './notifications/useToast';
@@ -112,6 +113,7 @@ export function Sidebar() {
     const [pendingMoveNode, setPendingMoveNode] = useState<FileNode | null>(null);
     const [moveTargetId, setMoveTargetId] = useState<string>('root');
     const [trashOpen, setTrashOpen] = useState(false);
+    const [historyFileId, setHistoryFileId] = useState<number | null>(null);
     const [contextMenu, setContextMenu] = useState<ContextMenuState>({
         open: false,
         x: 0,
@@ -149,12 +151,23 @@ export function Sidebar() {
             setOpenCreateProject(true);
         };
 
+        const handleOpenHistoryDialog = () => {
+            const fileId = useMarkdownStore.getState().activeFileId;
+            if (!fileId) {
+                toast.info('Open a file first to see its history.');
+                return;
+            }
+            setHistoryFileId(fileId);
+        };
+
         window.addEventListener('open-new-file-dialog', handleOpenNewFileDialog);
         window.addEventListener('open-new-project-dialog', handleOpenNewProjectDialog);
+        window.addEventListener('open-history-dialog', handleOpenHistoryDialog);
 
         return () => {
             window.removeEventListener('open-new-file-dialog', handleOpenNewFileDialog);
             window.removeEventListener('open-new-project-dialog', handleOpenNewProjectDialog);
+            window.removeEventListener('open-history-dialog', handleOpenHistoryDialog);
         };
     }, [activeProjectId, toast]);
 
@@ -410,7 +423,7 @@ export function Sidebar() {
         openContextMenuAt(node, rect.left + 8, rect.bottom + 4);
     };
 
-    const handleContextAction = async (action: 'open' | 'new-file' | 'rename' | 'delete' | 'move') => {
+    const handleContextAction = async (action: 'open' | 'new-file' | 'rename' | 'delete' | 'move' | 'history') => {
         const targetNode = contextMenu.node;
         if (!targetNode?.id) return;
 
@@ -438,6 +451,11 @@ export function Sidebar() {
             setPendingMoveNode(targetNode);
             setMoveTargetId('root');
             setOpenMoveNode(true);
+            return;
+        }
+
+        if (action === 'history' && targetNode.type === 'file') {
+            setHistoryFileId(targetNode.id);
             return;
         }
 
@@ -1028,6 +1046,14 @@ export function Sidebar() {
                             <button
                                 type="button"
                                 role="menuitem"
+                                className="w-full text-left px-3 py-1.5 text-sm text-[var(--dropdown-fg)] hover:bg-[var(--dropdown-hover)] rounded focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                                onClick={() => void handleContextAction('history')}
+                            >
+                                History
+                            </button>
+                            <button
+                                type="button"
+                                role="menuitem"
                                 className="w-full text-left px-3 py-1.5 text-sm text-red-500 hover:bg-[var(--dropdown-hover)] rounded focus:outline-none focus:ring-2 focus:ring-red-500"
                                 onClick={() => void handleContextAction('delete')}
                             >
@@ -1177,6 +1203,15 @@ export function Sidebar() {
                     </Dialog.Content>
                 </Dialog.Portal>
             </Dialog.Root>
+
+            {/* Version History Dialog */}
+            <HistoryDialog
+                open={historyFileId != null}
+                onOpenChange={(open) => {
+                    if (!open) setHistoryFileId(null);
+                }}
+                fileId={historyFileId}
+            />
         </>
     );
 }

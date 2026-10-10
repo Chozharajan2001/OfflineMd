@@ -5,6 +5,7 @@ import { useMarkdownStore } from './store';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { ResizableLayout } from './components/ResizableLayout';
+import { CommandPalette } from './components/CommandPalette';
 
 /**
  * Handles launch URLs: app shortcuts (?new=file) and shared links.
@@ -30,6 +31,7 @@ export default function Home() {
       </a>
       <DeepLinkHandler />
       <Header />
+      <CommandPalette />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />
         <main id="main-content" className="flex-1 flex min-w-0" aria-label="Editor workspace">

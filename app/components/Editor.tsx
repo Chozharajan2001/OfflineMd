@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MonacoEditor from '@monaco-editor/react';
 import { useMarkdownStore } from '../store';
 import { db } from '../services/Database';
+import { captureRevision } from '../utils/history';
 
 const AUTOSAVE_DELAY_MS = 2500;
 
@@ -32,6 +33,7 @@ export function Editor() {
                         content: s.markdown,
                         updatedAt: new Date(),
                     });
+                    void captureRevision(s.activeFileId as number, s.markdown);
                     if (useMarkdownStore.getState().revision === currentRevision) {
                         s.setSaved();
                     } else {

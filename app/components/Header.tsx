@@ -13,6 +13,7 @@ import { ExportProgressBar } from '../../src/export/components/ExportProgressBar
 import { triggerDownload } from '../../src/export/utils/file-saver';
 import { db } from '../services/Database';
 import { buildWorkspaceBackup, restoreWorkspaceBackup } from '../utils/backup';
+import { captureRevision } from '../utils/history';
 import { ConfirmDialog, InputDialog } from './dialogs';
 import { Button, IconButton } from './ui';
 import { PwaInstallButton, OfflineBadge } from './PwaInstall';
@@ -92,6 +93,7 @@ export function Header() {
                     content: markdown,
                     updatedAt: new Date(),
                 });
+                void captureRevision(activeFileId, markdown);
                 // Check if any edits occurred during the save
                 if (useMarkdownStore.getState().revision === currentRevision) {
                     setSaved();
@@ -146,6 +148,7 @@ export function Header() {
             } else {
                 markDirty();
             }
+            void captureRevision(id as number, markdown);
             toast.success('Document saved!');
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Save failed';
@@ -209,6 +212,7 @@ export function Header() {
             } else {
                 markDirty();
             }
+            void captureRevision(id as number, pendingImportContent);
             toast.success('File imported successfully!');
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Import failed';
@@ -383,7 +387,11 @@ export function Header() {
         };
 
         window.addEventListener('keydown', handleGlobalShortcuts);
-        return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+        window.addEventListener('open-export-dialog', openExportDialog);
+        return () => {
+            window.removeEventListener('keydown', handleGlobalShortcuts);
+            window.removeEventListener('open-export-dialog', openExportDialog);
+        };
     }, [activeProjectId, openExportDialog, toast, handleSave]);
 
     return (

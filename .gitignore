@@ -42,3 +42,8 @@ next-env.d.ts
 
 # generated service worker (Serwist rebuilds on every build)
 /public/sw.js
+
+# playwright + coverage artefacts
+/test-results/
+/playwright-report/
+/coverage/

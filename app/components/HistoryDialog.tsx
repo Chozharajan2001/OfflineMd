@@ -22,11 +22,11 @@ interface HistoryDialogProps {
 export function HistoryDialog({ open, onOpenChange, fileId }: HistoryDialogProps) {
   const toast = useToast();
   const markdown = useMarkdownStore((s) => s.markdown);
-  const revisions =
-    useLiveQuery(
-      () => (fileId ? db.revisions.where('fileId').equals(fileId).sortBy('createdAt') : []),
-      [fileId, open]
-    ) || [];
+  const revisionsResult = useLiveQuery(
+    () => (fileId ? db.revisions.where('fileId').equals(fileId).sortBy('createdAt') : []),
+    [fileId, open]
+  );
+  const revisions = useMemo(() => revisionsResult ?? [], [revisionsResult]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const ordered = useMemo(() => [...revisions].reverse(), [revisions]);

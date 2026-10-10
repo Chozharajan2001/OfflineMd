@@ -65,6 +65,10 @@ export function Sidebar() {
         ensuredProject.current = true;
         void (async () => {
             try {
+                // Surface database open failures (e.g. on-disk version newer
+                // than declared after profile contamination): without this the
+                // sidebar silently renders empty forever.
+                await db.open();
                 const count = await db.projects.count();
                 if (count === 0) {
                     const now = new Date();
@@ -83,8 +87,10 @@ export function Sidebar() {
                     if (latest?.id) setActiveProject(latest.id);
                 }
             } catch {
-                // IndexedDB unavailable (private mode quota, etc.) — app still
-                // works unsaved; header save/import paths already handle null.
+                // IndexedDB unavailable (private mode quota, version conflict,
+                // etc.) — app still works unsaved; header save/import paths
+                // already handle null. Name the failure instead of silence.
+                toast.error('Local database unavailable — files will not persist');
             }
         })();
     }, [setActiveProject, toast]);

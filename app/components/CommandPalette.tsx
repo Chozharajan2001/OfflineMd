@@ -32,6 +32,13 @@ export function CommandPalette() {
     toggleScrollSyncEnabled,
   } = useMarkdownStore();
 
+  const filesResult = useLiveQuery(
+    () => db.nodes.filter((n) => n.type === 'file' && !n.deletedAt).toArray()
+  );
+  const files = useMemo(() => filesResult ?? [], [filesResult]);
+  const projectsResult = useLiveQuery(() => db.projects.toArray());
+  const projects = useMemo(() => projectsResult ?? [], [projectsResult]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -53,12 +60,6 @@ export function CommandPalette() {
     };
   }, []);
 
-  useEffect(() => {
-    if (open) setQuery('');
-  }, [open ]);
-
-  const files = useLiveQuery(() => db.nodes.filter((n) => n.type === 'file' && !n.deletedAt).toArray()) || [];
-  const projects = useLiveQuery(() => db.projects.toArray()) || [];
   const projectName = useMemo(() => {
     const map = new Map<number, string>();
     for (const p of projects) if (typeof p.id === 'number') map.set(p.id, p.name);
@@ -109,7 +110,13 @@ export function CommandPalette() {
     : actions;
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(v) => {
+        if (v) setQuery('');
+        setOpen(v);
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[130]" />
         <Dialog.Content

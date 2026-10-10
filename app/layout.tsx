@@ -65,6 +65,7 @@ export default function RootLayout({
                 <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
             </head>
             <body
+                suppressHydrationWarning
                 className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased`}
             >
                 <ThemeProvider>

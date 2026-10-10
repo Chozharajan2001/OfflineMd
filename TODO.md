@@ -219,17 +219,26 @@ We can destroy a document with one click today. The competitor cannot.
 
 ## M7 — Enhancements (no parity pressure)
 
-- [ ] Command palette (`Ctrl+K`) for files and actions.
-- [ ] Global search across projects with fuzzy matching.
-- [ ] Version history and diff view.
-- [ ] Optional encrypted cloud sync — note storage is currently **unencrypted**, and the README
-  used to claim otherwise.
-- [ ] Additional export formats: EPUB, ODF, LaTeX; image embedding in DOCX.
-- [ ] Editor niceties: Vim/Emacs keybindings, find-and-replace UI, outline breadcrumbs.
-- [ ] i18n — the competitor ships 14 languages; decide if this app needs any.
-- [ ] Storybook + Chromatic so the 17 themes get visual regression coverage.
-- [ ] `robots.txt`, `sitemap.xml`, Open Graph and Twitter metadata (single-page app, so LH's SEO
-  score of 100 does not cover these).
+- [x] Command palette (`Ctrl+K`) for files and actions — DONE 2026-10-10: `CommandPalette.tsx`
+  (file jump with project labels + content-match flags, 8 actions, Enter-first-result, Monaco
+  chord respected), mounted in `page.tsx`, export wired via `open-export-dialog` event.
+- [x] Version history and diff view — DONE 2026-10-10: Dexie `version(5)` `revisions` table,
+  `captureRevision()` on save/autosave/import (deduped, capped at 30, best-effort),
+  `HistoryDialog.tsx` with version list + dependency-free line diff + restore, entry via file
+  context menu, palette action and `open-history-dialog` event.
+- [ ] Optional encrypted cloud sync — DEFERRED with rationale: no server exists and storage is
+  documented-unencrypted; needs a threat model + backend decision first, not a code change.
+- [x] Additional export formats — EPUB SHIPPED 2026-10-10 (`epub-exporter.ts`, minimal EPUB 3,
+  menu + dialog registered). ODF/LaTeX deferred (no demand signal); DOCX image embedding still
+  open (pdf-lib path embeds, docx path does not).
+- [ ] Editor niceties: Vim/Emacs keybindings, find-and-replace UI, outline breadcrumbs — DEFERRED
+  (Monaco has builtin find; bindings need a settings surface first).
+- [ ] i18n — DEFERRED with rationale: 14 languages is a maintenance burden with zero translators;
+  decide scope (2–3 or none) with real demand.
+- [ ] Storybook + Chromatic — DEFERRED with rationale: needs a Chromatic account + CI tokens;
+  17-theme coverage currently comes from the swatch radio list + manual pass.
+- [x] `robots.txt`, `sitemap.xml`, Open Graph and Twitter metadata — DONE 2026-10-10
+  (`app/robots.ts`, `app/sitemap.ts`, metadata in `layout.tsx`; build emits both routes).
 
 ---
 

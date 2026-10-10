@@ -60,9 +60,7 @@ export interface ExportOptions {
     orientation: 'portrait' | 'landscape';
     margins: { top: number; right: number; bottom: number; left: number };
     fontSize: number;
-    headerFooter: boolean;
     embedImages: boolean;           // Base64‑encode images into the export
-    syntaxHighlight: boolean;      // Apply syntax highlighting to code blocks
 }
 
 /**

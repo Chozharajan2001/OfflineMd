@@ -291,9 +291,7 @@ export function Header() {
                             orientation: 'portrait' as const,
                             margins: { top: 10, right: 10, bottom: 10, left: 10 },
                             fontSize: 12,
-                            headerFooter: false,
                             embedImages: false,
-                            syntaxHighlight: false,
                         },
                         metadata: await buildExportMetadata(),
                         onProgress: (p: number) => {

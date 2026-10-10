@@ -15,9 +15,7 @@ const options: ExportOptions = {
   orientation: 'portrait',
   margins: { top: 10, right: 10, bottom: 10, left: 10 },
   fontSize: 12,
-  headerFooter: false,
   embedImages: false,
-  syntaxHighlight: false,
 };
 
 const FIXTURE = '---\ntitle: Contract <Doc>\n---\n# Hello: World?\n\nSome **bold** text.\n';

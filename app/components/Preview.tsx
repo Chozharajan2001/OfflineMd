@@ -372,6 +372,7 @@ export function Preview() {
                         Create your first project
                     </button>
                     <p className="text-sm opacity-70">…or pick a file from the sidebar to keep editing.</p>
+                    <p className="text-sm opacity-70">Installable app: use the install icon in the header for offline use.</p>
                 </div>
                 <style>{proseStyles}</style>
                 <div

@@ -11,9 +11,7 @@ const defaultOptions: ExportOptions = {
     orientation: 'portrait',
     margins: { top: 10, right: 10, bottom: 10, left: 10 },
     fontSize: 12,
-    headerFooter: false,
     embedImages: true,
-    syntaxHighlight: true,
 };
 
 interface ExportOptionsDialogProps {
@@ -73,6 +71,9 @@ export function ExportOptionsDialog({
             if (typeof val !== 'number' || val < 0 || val > 50) {
                 return `Margin ${key} must be a number between 0 and 50.`;
             }
+        }
+        if (typeof options.fontSize !== 'number' || options.fontSize < 6 || options.fontSize > 24) {
+            return 'Font size must be a number between 6 and 24.';
         }
         // Additional validation can be added here as needed
         return null;
@@ -213,6 +214,55 @@ export function ExportOptionsDialog({
                                         <option value="landscape">Landscape</option>
                                     </select>
                                 </label>
+
+                                {/* Base font size (pt) */}
+                                <label className="flex items-center gap-2">
+                                    <span>Font size</span>
+                                    <input
+                                        type="number"
+                                        min={6}
+                                        max={24}
+                                        step={1}
+                                        value={options.fontSize}
+                                        onChange={e => {
+                                            const n = parseInt(e.target.value, 10);
+                                            setOptions(prev => ({ ...prev, fontSize: Number.isFinite(n) ? Math.min(24, Math.max(6, n)) : 12 }));
+                                        }}
+                                        aria-label="Base font size in points"
+                                        className="w-20 bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-fg)] p-1 rounded"
+                                    />
+                                </label>
+
+                                {/* Margins (mm) */}
+                                <fieldset>
+                                    <legend className="mb-1">Margins (mm)</legend>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {(['top', 'right', 'bottom', 'left'] as const).map((key) => (
+                                            <label key={key} className="flex items-center gap-2 capitalize">
+                                                <span className="w-14">{key}</span>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    max={50}
+                                                    step={1}
+                                                    value={options.margins[key]}
+                                                    onChange={e => {
+                                                        const n = parseInt(e.target.value, 10);
+                                                        setOptions(prev => ({
+                                                            ...prev,
+                                                            margins: {
+                                                                ...prev.margins,
+                                                                [key]: Number.isFinite(n) ? Math.min(50, Math.max(0, n)) : 10,
+                                                            },
+                                                        }));
+                                                    }}
+                                                    aria-label={`${key} margin in millimeters`}
+                                                    className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--input-fg)] p-1 rounded"
+                                                />
+                                            </label>
+                                        ))}
+                                    </div>
+                                </fieldset>
                             </section>
                         )}
                     </div>

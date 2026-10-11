@@ -648,8 +648,9 @@ User Action (Create/Delete/Load)
 ### 3. Organization System
 - ✅ **Projects** - Create multiple projects for different contexts
 - ✅ **Hierarchical folders** - Organize files with nested folder support
-- ✅ **File management** - Create, rename and delete files and folders (move/reparent is not implemented)
+- ✅ **File management** - Create, rename, move, trash/restore, delete (with undo toasts)
 - ✅ **Recent files** - Quick access to recently edited documents
+- ✅ Content + name search, favorites, command palette, version history, autosave
 - ✅ Reactive database queries with dexie-react-hooks
 
 ### 4. Theming System
@@ -1276,9 +1277,11 @@ npm run dev
 
 ```bash
 npm run dev      # Start development server with webpack
-npm run build    # Build for production
+npm run build    # Production build (also generates the Serwist service worker)
 npm run start    # Start production server
-npm run lint     # Run ESLint
+npm run lint     # Run ESLint (must be 0 errors / 0 warnings)
+npm test         # Vitest unit tests (no browser needed)
+npm run test:e2e # Playwright smoke (needs a running server; system Chrome)
 ```
 
 ### Project Structure
@@ -1420,7 +1423,25 @@ the editor pane needs network until Monaco is bundled (M6).
 **A**: Chrome/Edge 90+, Firefox 88+, Safari 14+, Opera 76+. Requires IndexedDB support.
 
 ### Q: Where is the export system located?
-**A**: The new modular export system is in `src/export/`. The old `app/services/ExportService.ts` is deprecated.
+**A**: All exports live in `src/export/` — `ExportOrchestrator` lazy-loads one exporter per format. The old `app/services/ExportService.ts` (html2pdf path) was **deleted**.
+
+### Q: Why doesn't the installed app work when my dev server is off?
+**A**: Installing from `npm run dev` creates no service worker, so the icon is just a browser
+shortcut to `localhost:3000` — nothing left to serve it when Node stops. Build for production
+(`npm run build && npm run start`) or install from a deployed URL; then the worker caches the
+shell and offline works (except Monaco, which loads from a CDN).
+
+### Q: Can I recover an older version of a document?
+**A**: Yes — right-click a file → **History** (or `Ctrl+K` → "File history") to diff snapshots
+and restore. Snapshots are captured on save/autosave, capped at 30 per file.
+
+### Q: My keyboard shortcuts don't work inside the editor.
+**A**: `Ctrl/Cmd+K` is reserved for Monaco's own chord inside the editor; the command palette
+still works everywhere else (and via the overflow menu).
+
+### Q: Where are the automated tests?
+**A**: `npm test` runs 34 Vitest unit tests (exporter contracts + utils), `npm run test:e2e`
+runs the Playwright smoke spec, and CI runs both plus `tsc`/`eslint`/`build` on push.
 
 ### Q: Why are there TypeScript errors?
 **A**: There are none — `npx tsc --noEmit` is clean and `npx eslint .` reports 0 errors / 0 warnings. An older revision of this FAQ listed four historical errors; all were fixed.
@@ -1449,5 +1470,5 @@ the editor pane needs network until Monaco is bundled (M6).
 
 ---
 
-*Last Updated: March 15, 2026*  
+*Last Updated: 2026-10-10*  
 *Project Version: 0.1.0*

@@ -66,10 +66,12 @@ npm run dev
 ### Available Scripts
 
 ```bash
-npm run dev      # Development server with webpack
-npm run build    # Production build
+npm run dev      # Development server with webpack (no service worker — see PWA notes)
+npm run build    # Production build (also generates the Serwist worker)
 npm run start    # Production server
-npm run lint     # ESLint checking
+npm run lint     # ESLint checking (0 errors / 0 warnings expected)
+npm test         # Vitest unit tests
+npm run test:e2e # Playwright smoke test (needs a running server)
 ```
 
 ---
@@ -80,30 +82,39 @@ npm run lint     # ESLint checking
 markdown-converter/
 ├── app/                          # Next.js App Router
 │   ├── components/               # React components
-│   │   ├── Editor.tsx           # Monaco Editor wrapper
-│   │   ├── Preview.tsx          # Markdown preview
-│   │   ├── Header.tsx           # Toolbar with export
-│   │   ├── Sidebar.tsx          # File navigation
-│   │   ├── ResizableLayout.tsx  # Split-pane layout
-│   │   └── ThemeProvider.tsx    # Theme synchronization
+│   │   ├── Editor.tsx           # Monaco wrapper + autosave + status bar
+│   │   ├── Preview.tsx          # Markdown preview (sanitize, Mermaid, KaTeX, TOC jumps)
+│   │   ├── Header.tsx           # Toolbar: save, export, view modes, settings
+│   │   ├── Sidebar.tsx          # Projects, tree, search, trash, recents, favorites
+│   │   ├── CommandPalette.tsx   # Ctrl+K file/action palette
+│   │   ├── HistoryDialog.tsx    # Version history + diff + restore
+│   │   ├── TableOfContents.tsx  # In-document TOC
+│   │   ├── PwaInstall.tsx       # Install button + offline badge
+│   │   ├── SwRegister.tsx       # Service worker registration (prod only)
+│   │   ├── ResizableLayout.tsx  # Editor/split/preview layout
+│   │   ├── ThemeProvider.tsx    # Theme tokens + Monaco theme
+│   │   ├── ui/                  # Shared Button / IconButton
+│   │   ├── dialogs/             # Radix Input/Confirm dialogs
+│   │   └── notifications/       # Toast store + components
 │   ├── services/                # Business logic
-│   │   ├── Database.ts          # Dexie.js schema
-│   │   ├── MarkdownParser.ts    # Unified.js processor
-│   │   └── ExportService.ts     # Legacy export (deprecated)
-│   ├── store.ts                 # Zustand state management
-│   ├── layout.tsx               # Root layout
-│   ├── page.tsx                 # Main page
+│   │   ├── Database.ts          # Dexie schema (v5: projects/nodes/revisions)
+│   │   └── MarkdownParser.ts    # Unified.js processor
+│   ├── utils/                   # backup, history, zip-project
+│   ├── store.ts                 # Zustand state + 17 theme presets
+│   ├── layout.tsx               # Root layout (fonts, manifest, metadata)
+│   ├── page.tsx                 # Main page (+ deep-link handler)
+│   ├── sw.ts                    # Serwist worker source
+│   ├── robots.ts, sitemap.ts    # SEO routes
 │   └── globals.css              # Global styles
-├── src/                          # Additional source
-│   └── export/                  # New export system
-│       ├── export-service.ts    # Export orchestrator
-│       ├── types.ts             # Export types
-│       ├── components/          # Export UI
-│       ├── exporters/           # Format exporters
-│       └── utils/               # Export utilities
-├── types/                        # TypeScript declarations
-├── public/                       # Static assets
-└── Documentation files
+├── src/export/                  # Export system
+│   ├── export-service.ts        # ExportOrchestrator (lazy imports)
+│   ├── types.ts                 # Export types
+│   ├── components/              # ExportMenu, options dialog, progress bar
+│   ├── exporters/               # md, txt, html, pdf, docx, pptx, png, epub
+│   └── utils/                   # sanitizer, theme-to-css, safe-filename, toc, …
+├── e2e/                         # Playwright smoke spec
+├── docs/                        # This documentation
+└── TODO.md                      # Live backlog + decisions
 ```
 
 ---
@@ -143,32 +154,26 @@ User Input → Editor → Zustand Store → Preview → Rendered HTML
 
 ### Editor (`app/components/Editor.tsx`)
 
-- Monaco Editor integration
-- Markdown language mode
-- Theme-responsive font sizing
-- SSR-safe client-side rendering
+- Monaco Editor integration (theme `custom-theme`)
+- Autosave (2.5s idle, revision-guarded) + merged status bar (state + stats)
 
 ### Preview (`app/components/Preview.tsx`)
 
-- Debounced parsing (150ms)
-- Unified.js markdown processing
-- Mermaid diagram rendering
-- Theme-aware inline CSS
+- Debounced parsing (150ms) with race-token guard, double sanitization
+- Unified.js processing, Mermaid (strict, scoped), KaTeX math
+- Front-matter badge, preview toolbar, TOC jump handling
 
 ### Sidebar (`app/components/Sidebar.tsx`)
 
-- Project management
-- Hierarchical file tree
-- CRUD operations
-- Recent files list
+- Projects (auto-created "My Notes"), nested tree, move/rename/trash + undo
+- Name + content search with snippets, favorites, recents, contents, trash footer
 - Live queries with dexie-react-hooks
 
 ### Header (`app/components/Header.tsx`)
 
-- File operations (save, import)
-- Export menu (6 formats)
-- Theme settings dialog
-- Export progress indicator
+- Save primary + export split-button, import file/URL, copy markdown
+- View-mode segmented control, overflow menu, settings tabs
+- Export progress with cancellation
 
 ### ThemeProvider (`app/components/ThemeProvider.tsx`)
 
@@ -204,10 +209,13 @@ interface MarkdownStore {
 
 ### Persistence
 
-Uses Zustand's `persist` middleware to save to localStorage:
-- Editor content
-- Active project/file IDs
-- Theme configuration
+Uses Zustand's `persist` middleware to save to **localStorage**:
+- Active project/file IDs, save state, view mode, scroll-sync, theme
+- **Not** persisted: the full markdown text (lives in IndexedDB via `app/utils/`) and
+  `pendingDeepLink` (one-shot launch intent)
+
+**Database** (`app/services/Database.ts`, Dexie **v5**): `projects`, `nodes` (+`deletedAt`
+trash, +`isFavorite`), and `revisions` (version history). Plus the legacy `documents` table.
 
 ---
 
@@ -472,7 +480,7 @@ Before submitting changes, verify:
 1. **Editor**: Typing, theme changes, large documents
 2. **Preview**: Markdown rendering, Mermaid diagrams, theme switching
 3. **Sidebar**: Project creation, file operations, folder nesting
-4. **Export**: All 6 formats with various content
+4. **Export**: All 8 formats with various content
 5. **Themes**: All 17 themes render correctly
 
 ---
@@ -503,25 +511,27 @@ Before submitting changes, verify:
 
 ## Areas Needing Contribution
 
-### High Priority
+Everything below previously listed here is **shipped**: PPTX/PNG/EPUB export, rich DOCX,
+responsive/mobile layout, keyboard shortcuts, word count, view modes, autosave, search,
+trash/restore, move, version history, PWA. See `TODO.md` for the live backlog.
 
-1. **PPTX Export** - Full implementation needed
-2. **DOCX Rich Formatting** - Convert markdown AST to formatted DOCX
-3. **Mobile UI** - Responsive improvements for tablets/phones
+### Open, with rationale
 
-### Medium Priority
+1. **DOCX image embedding** — the last real export gap (PDF already embeds PNG/JPG).
+2. **Fuzzy matching** for search + **cross-project results UI** (substring matching + palette exist).
+3. **Skeleton screens** replacing the "Loading…" text states.
+4. **Spacing/radius tokens** — dialogs still mix `p-4 rounded` / `p-6 rounded-lg`.
+5. **Monaco bundling or vendoring** — closes the offline editor gap (CDN + preconnect today;
+   bundling measured +10.4MB raw and rejected, so this needs a size budget decision).
+6. **Encrypted cloud sync** — needs a threat model + backend decision, not a code change.
+7. **i18n scope** (which 2–3 locales, if any), **Storybook/Chromatic** (needs an account).
+8. **HTML5 drag-and-drop move** — the `Move to…` dialog already works.
+9. **`NodeItem` hoisting** — the tree subcomponents are defined inside `Sidebar()` and remount per render.
 
-1. **Keyboard Shortcuts** - Add common shortcuts (save, export, etc.)
-2. **Find/Replace** - Editor search functionality
-3. **Word Count** - Character and word statistics
-4. **File Import** - Better import with drag-and-drop
+### Good first issues
 
-### Nice to Have
-
-1. **Vim/Emacs Keybindings** - Alternative editor modes
-2. **Split Editor** - Multiple editor panes
-3. **Git Integration** - Version control UI
-4. **Plugin System** - Extensible architecture
+- Accessibility pass on the history dialog at 320px, plus a Playwright spec for it.
+- More exporter contract tests (PNG/EPUB today only cover the 5 core formats).
 
 ---
 

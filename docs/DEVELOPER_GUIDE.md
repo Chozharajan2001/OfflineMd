@@ -75,11 +75,24 @@ npm run dev
 ### Development Scripts
 
 ```bash
-npm run dev      # Development server with webpack
-npm run build    # Production build
+npm run dev      # Development server with webpack (no service worker in dev)
+npm run build    # Production build (also generates the Serwist worker)
 npm run start    # Production server
-npm run lint     # ESLint checking
+npm run lint     # ESLint checking — 0 errors / 0 warnings expected
+npm test         # Vitest unit tests (exporter contracts, utils)
+npm run test:e2e # Playwright smoke: boot → project → file → save → export
 ```
+
+### Testing
+
+| Layer | Tool | Command | Covers |
+|---|---|---|---|
+| Unit | Vitest | `npm test` | `safe-filename`, `theme-validation`, TOC/front-matter utils, all 5 core exporters against an `ExportResult` contract |
+| E2E | Playwright (system Chrome) | `npm run test:e2e` | Default-project boot, `?new=file` deep link, reload persistence, PDF download |
+| CI | GitHub Actions | `.github/workflows/ci.yml` | `tsc` + `eslint` + `test` + `build` on every push |
+
+There is no component-rendering test layer; UI changes still get a manual browser pass
+(320/768/1440 px, dark + light) before merging.
 
 ---
 
@@ -97,23 +110,29 @@ npm run lint     # ESLint checking
 - **Class Variance Authority**: Component variant management
 
 ### Editor & Preview
-- **Monaco Editor**: @monaco-editor/react for markdown editing
-- **Unified.js**: Markdown processing (remark/rehype)
+- **Monaco Editor**: @monaco-editor/react for markdown editing (CDN-loaded at runtime)
+- **Unified.js**: Markdown processing (remark-parse/gfm/math → rehype-katex/slug/sanitize/highlight/stringify)
 - **Highlight.js**: Syntax highlighting
-- **Mermaid**: Diagram rendering
+- **Mermaid**: Diagram rendering (lazy, `securityLevel: 'strict'`)
+- **KaTeX**: Math rendering (CSS in `layout.tsx`)
 
 ### State & Storage
-- **Zustand**: 5.x with persistence middleware
-- **Dexie.js**: 4.x IndexedDB wrapper
+- **Zustand**: 5.x with persistence middleware (localStorage, partialized)
+- **Dexie.js**: 4.x IndexedDB wrapper — schema **v5**
 - **dexie-react-hooks**: Reactive queries
 
 ### Export System
 - **pdf-lib**: PDF generation
 - **docx.js**: Word document creation
+- **pptxgenjs**: PowerPoint decks
+- **html-to-image**: PNG snapshots
+- **jszip**: EPUB + project ZIP
 - **file-saver**: Client-side downloads
+- **gray-matter**: YAML front matter
 
-### Build & Development
-- **ESLint**: 9.x with Next.js config
+### Quality & Build
+- **ESLint**: 9.x with Next.js config (0 errors / 0 warnings)
+- **Vitest** + **Playwright** + **GitHub Actions**
 - **PostCSS**: Tailwind processing
 - **@serwist/next**: PWA service worker (replaced `next-pwa@5`, incompatible with Next 16)
 
@@ -224,13 +243,13 @@ npm run lint     # ESLint checking
 
 ### 4. Header Component (`app/components/Header.tsx`)
 
-**Purpose**: Toolbar with file operations, export, and settings
+**Purpose**: Toolbar with save, export split-button, view modes, overflow menu, settings
 
 **Key Features**:
-- Save/import operations
-- Export menu (6 formats)
-- Theme settings dialog
-- Active file indicator
+- Revision-guarded save + import (file/URL) + copy markdown
+- Export menu (8 formats) with hints, last-used check, cancellable progress
+- Settings tabs (Appearance swatches / Workspace backup)
+- Shortcuts: save, export, new file/project, command palette
 
 **Dependencies**:
 - `ExportOrchestrator` from `src/export/`
@@ -241,13 +260,12 @@ npm run lint     # ESLint checking
 
 ### 5. ResizableLayout Component (`app/components/ResizableLayout.tsx`)
 
-**Purpose**: Split-pane layout for editor and preview
+**Purpose**: Editor-only / split / preview layout with resizable separator
 
 **Key Features**:
-- Horizontal split panels
-- Draggable separator
-- Minimum size constraints
-- Responsive to container
+- Conditional panes from `viewMode` (single-pane default on small screens)
+- Horizontal split panels, draggable separator, min-size constraints
+- Keyboard resize (arrow keys) with a labelled separator role
 
 **Dependencies**:
 - `react-resizable-panels`
@@ -539,11 +557,11 @@ interface ExportOptions {
 
 ### Areas Needing Contribution
 
-- **PPTX Export**: Full implementation needed
-- **DOCX Export**: Rich formatting (tables, images)
-- **Mobile UI**: Responsive improvements
-- **Performance**: Large file optimization
-- **Accessibility**: ARIA labels, keyboard nav
+See `TODO.md` for the live backlog — everything previously listed here (PPTX export, DOCX
+formatting, mobile UI, shortcuts, word count) is shipped. Open items with rationale:
+DOCX image embedding, fuzzy/cross-project search, skeleton screens, spacing/radius tokens,
+Monaco bundling (offline editor), encrypted sync (needs threat model), i18n scope,
+Storybook (needs account), HTML5 drag-and-drop move, `NodeItem` hoisting.
 
 ---
 
@@ -552,8 +570,8 @@ interface ExportOptions {
 ### Common Issues
 
 **Editor not loading**:
-- Check Monaco Editor webpack configuration
-- Verify `next.config.ts` settings
+- Monaco loads from CDN — check `next.config.ts` and your connection
+- Verify client-side hydration (`useEffect` pattern)
 
 **Export failing**:
 - Check browser console for errors
@@ -561,12 +579,39 @@ interface ExportOptions {
 - Check file-saver permissions
 
 **Database errors**:
-- Clear IndexedDB in DevTools
-- Check Dexie.js version compatibility
+- Clear IndexedDB in DevTools (Application → IndexedDB → Delete database)
+- Schema is **v5**; a mismatch shows a `VersionError` toast — the app surfaces
+  persistence failures instead of failing silently
 
 **Theme not applying**:
-- Verify CSS variables are set
-- Check Monaco theme definition
+- Verify CSS variables are set (`--background`, `--surface-2`, `--accent-text`, …)
+- Check the Monaco `custom-theme` definition in `ThemeProvider.tsx`
+
+**"A tree hydrated but some attributes … didn't match"**:
+- Almost always a **browser extension** (Grammarly is common for a writing app) adding
+  `data-*` attributes to `<body>`/elements before React hydrates. `<html>`/`<body>` carry
+  `suppressHydrationWarning`; if new nodes appear, add it there too.
+
+**"Installed app doesn't work when the dev server is off"**:
+- The service worker is **production-only** (`npm run build && npm run start`) and caches the
+  origin it was installed from. An app installed from `localhost` dev has no worker at all —
+  it's just a browser shortcut to a dead origin. Test offline with a production build or a
+  deployed URL. **Monaco still needs network** (CDN) — the one known offline gap.
+
+**Layout is empty / sidebar shows nothing**:
+- Check for the "Local database unavailable" toast (quota/blocked upgrade).
+- Hard-reload; if IndexedDB is mid-upgrade the page may have held a stale connection.
+
+---
+
+## PWA Notes for Contributors
+
+- Worker: `app/sw.ts` (Serwist `defaultCache`, `skipWaiting`, `clientsClaim`), built to
+  `public/sw.js` (git-ignored), registered by `SwRegister.tsx` **in production only**.
+- Dev intentionally has **no worker** to avoid stale caches while iterating.
+- Install UX: header install button (Chrome/Edge/Android `beforeinstallprompt`), iOS share-sheet
+  instructions, `OfflineBadge` in the header, manifest shortcuts + screenshots.
+- Verify offline in a production build or deployed URL, not under `npm run dev`.
 
 ---
 

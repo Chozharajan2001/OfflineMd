@@ -35,21 +35,39 @@ npm run dev
 markdown-converter/
 ├── app/
 │   ├── components/           # UI components
-│   │   ├── Editor.tsx       # Monaco Editor
-│   │   ├── Preview.tsx      # Markdown preview
-│   │   ├── Header.tsx       # Toolbar
-│   │   ├── Sidebar.tsx      # File explorer
-│   │   └── ...
-│   ├── services/            # Business logic
-│   │   ├── Database.ts      # IndexedDB schema
-│   │   └── MarkdownParser.ts
-│   ├── store.ts             # Zustand state
-│   └── ...
-├── src/
-│   └── export/              # Export system
-│       ├── exporters/       # Format exporters
-│       └── components/      # Export UI
-└── ...
+│   │   ├── Editor.tsx        # Monaco Editor (+ autosave, status bar)
+│   │   ├── Preview.tsx       # Markdown preview (Mermaid, KaTeX, sanitize)
+│   │   ├── Header.tsx        # Toolbar
+│   │   ├── Sidebar.tsx       # Projects, tree, search, trash
+│   │   ├── CommandPalette.tsx# Ctrl+K palette
+│   │   ├── HistoryDialog.tsx # Version history + diff
+│   │   ├── TableOfContents.tsx
+│   │   ├── PwaInstall.tsx    # Install button + offline badge
+│   │   ├── SwRegister.tsx    # Service worker registration
+│   │   ├── ResizableLayout.tsx, ThemeProvider.tsx
+│   │   ├── ui/               # Shared Button / IconButton
+│   │   ├── dialogs/, notifications/
+│   ├── services/             # Business logic
+│   │   ├── Database.ts       # IndexedDB schema (v5)
+│   │   └── MarkdownParser.ts # Unified.js pipeline
+│   ├── utils/                # backup, history, zip-project
+│   ├── store.ts              # Zustand state
+│   ├── sw.ts                 # Serwist worker source
+│   └── layout.tsx, page.tsx, globals.css, robots.ts, sitemap.ts
+├── src/export/               # Export system
+│   ├── exporters/            # md, txt, html, pdf, docx, pptx, png, epub
+│   └── components/           # ExportMenu, options dialog, progress bar
+├── e2e/                      # Playwright smoke test
+└── docs/                     # Documentation
+```
+
+## Quality Commands
+
+```bash
+npx tsc --noEmit   # type check (must be clean)
+npx eslint .       # lint (0 errors / 0 warnings)
+npm test           # unit tests
+npm run test:e2e   # browser smoke test
 ```
 
 ---
@@ -88,6 +106,28 @@ npm run build
 ```bash
 npm run lint
 ```
+
+### Run Tests
+
+```bash
+npm test         # unit tests (Vitest)
+npm run test:e2e # browser smoke test (needs a running server)
+```
+
+---
+
+## Working with the PWA
+
+The service worker is **production-only**, so "installed app works offline" must be verified
+against a production build or a deployed URL — never against `npm run dev` (where no worker
+exists and the installed icon is just a shortcut to `localhost:3000`).
+
+```bash
+npm run build && npm run start
+# open http://localhost:3000, install, then DevTools → Network: Offline → reload
+```
+
+Known gap: **Monaco Editor loads from CDN**, so the editor pane still needs network.
 
 ---
 
